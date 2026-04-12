@@ -1,0 +1,54 @@
+{
+  "name": "baba-workspace",
+  "version": "0.9.2",
+  "description": "Baba Workspace - AI-Powered Desktop Assistant",
+  "main": "src/main/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build && electron-builder",
+    "vite": "vite",
+    "electron": "electron .",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "baba",
+    "workspace",
+    "ai",
+    "desktop"
+  ],
+  "author": "Silva",
+  "license": "MIT",
+  "type": "module",
+  "build": {
+    "appId": "com.baba.workspace",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "src/main/**/*"
+    ]
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "electron-builder": "^26.8.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.8",
+    "wait-on": "^9.0.5"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.99.0",
+    "axios": "^1.15.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "electron": "^31.7.6",
+    "lucide-react": "^1.8.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "sqlite3": "^6.0.1",
+    "zustand": "^5.0.12"
+  }
+}
