@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useAppStore } from '../../stores/appStore';
 
 interface BrainStats {
   total: number;
@@ -29,10 +28,13 @@ export function BrainView() {
     await Promise.all([loadStats(), loadRecent()]);
   }
 
-  async function loadStats() {
+async function loadStats() {
     try {
       const data = await window.babaAPI.brainStats();
-      setStats(data);
+      setStats({
+        total: Number(data?.total || 0),
+        byCategory: data?.byCategory && typeof data.byCategory === 'object' ? data.byCategory : {},
+      });
     } catch (err) {
       console.error('Failed to load brain stats:', err);
     }
@@ -41,7 +43,17 @@ export function BrainView() {
   async function loadRecent() {
     try {
       const data = await window.babaAPI.brainRecent(30);
-      setItems(data);
+      const normalized = Array.isArray(data)
+        ? data.map((item: any) => ({
+            id: Number(item?.id || 0),
+            title: String(item?.title || 'Untitled'),
+            category: String(item?.category || 'unknown'),
+            source: String(item?.source || 'local'),
+            content: String(item?.content || ''),
+            created_at: String(item?.created_at || ''),
+          }))
+        : [];
+      setItems(normalized);
     } catch (err) {
       console.error('Failed to load recent items:', err);
     }
@@ -56,7 +68,17 @@ export function BrainView() {
     setLoading(true);
     try {
       const data = await window.babaAPI.brainSearch(searchQuery);
-      setItems(data);
+      const normalized = Array.isArray(data)
+        ? data.map((item: any) => ({
+            id: Number(item?.id || 0),
+            title: String(item?.title || 'Untitled'),
+            category: String(item?.category || 'unknown'),
+            source: String(item?.source || 'local'),
+            content: String(item?.content || ''),
+            created_at: String(item?.created_at || ''),
+          }))
+        : [];
+      setItems(normalized);
     } catch (err) {
       console.error('Search failed:', err);
     } finally {
@@ -113,7 +135,7 @@ export function BrainView() {
                 {item.category} · {item.source} · {item.created_at}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                {item.content.substring(0, 200)}...
+                {(item.content || '').substring(0, 200)}...
               </div>
             </div>
           ))

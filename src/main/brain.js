@@ -87,11 +87,18 @@ export class BrainIndex {
   recent(n = 20) {
     return new Promise((resolve, reject) => {
       this.conn.all(
-        "SELECT id,title,category,source,created_at FROM items ORDER BY id DESC LIMIT ?",
+        "SELECT id,title,category,source,content,created_at FROM items ORDER BY id DESC LIMIT ?",
         [n],
         (err, rows) => {
           if (err) reject(err);
-          else resolve(rows);
+          else resolve((rows || []).map((r) => ({
+            id: r.id,
+            title: r.title,
+            category: r.category,
+            source: r.source,
+            content: String(r.content || '').substring(0, 400),
+            created_at: r.created_at,
+          })));
         }
       );
     });
