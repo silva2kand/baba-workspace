@@ -17,6 +17,8 @@ export function ChatView() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [chatMode, setChatMode] = useState<'chat' | 'face' | 'voice'>('chat');
   const [assignAgent, setAssignAgent] = useState<string | null>(null);
+  const [followUpByMessageId, setFollowUpByMessageId] = useState<Record<string, string[]>>({});
+  const [followUpLoadingFor, setFollowUpLoadingFor] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,12 +31,102 @@ export function ChatView() {
     setChatDraft('');
   }, [chatDraft, setChatDraft]);
 
+  function parseFollowUpList(raw: string): string[] {
+    const text = String(raw || '').trim();
+    if (!text) return [];
+
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 3);
+      }
+    } catch {
+      // ignore and continue with line parsing
+    }
+
+    return text
+      .split('\n')
+      .map((line) => line.replace(/^[-*•\d.)\s]+/, '').trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+
+  function fallbackFollowUps(userInput: string, assistantText: string): string[] {
+    const joined = `${userInput}\n${assistantText}`.toLowerCase();
+    if (joined.includes('email') || joined.includes('reply')) {
+      return [
+        'Draft the final email I can send now.',
+        'Give me a short follow-up checklist for this thread.',
+        'Create a polite reminder if no reply in 48 hours.',
+      ];
+    }
+    if (joined.includes('case') || joined.includes('legal')) {
+      return [
+        'Summarize next legal actions by priority.',
+        'Draft a concise update I can send to my solicitor.',
+        'List evidence/documents still missing for this case.',
+      ];
+    }
+    if (joined.includes('task') || joined.includes('plan')) {
+      return [
+        'Break this into actionable tasks with deadlines.',
+        'Which step should I do first right now?',
+        'Prepare a short status update I can share.',
+      ];
+    }
+    return [
+      'What should I do next?',
+      'Can you turn this into a step-by-step checklist?',
+      'Draft the message I should send now.',
+    ];
+  }
+
+  async function generateFollowUps(messageId: string, userInput: string, assistantText: string) {
+    setFollowUpLoadingFor(messageId);
+    try {
+      const prompt = [
+        'Create exactly 3 short follow-up prompts the user can click next.',
+        'Return only a JSON array of 3 strings.',
+        `User message: ${userInput}`,
+        `Assistant response: ${assistantText}`,
+      ].join('\n');
+
+      const raw = await chatWithModel(
+        selectedProvider,
+        selectedModel,
+        [
+          {
+            role: 'system',
+            content: 'You generate concise follow-up prompts. Output strict JSON only.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ]
+      );
+
+      const suggestions = parseFollowUpList(raw);
+      const finalSuggestions = suggestions.length > 0
+        ? suggestions
+        : fallbackFollowUps(userInput, assistantText);
+
+      setFollowUpByMessageId((prev) => ({ ...prev, [messageId]: finalSuggestions }));
+    } catch {
+      setFollowUpByMessageId((prev) => ({ ...prev, [messageId]: fallbackFollowUps(userInput, assistantText) }));
+    } finally {
+      setFollowUpLoadingFor((prev) => (prev === messageId ? null : prev));
+    }
+  }
+
   async function handleSend() {
     if (!input.trim() || isStreaming) return;
+    const userInput = input;
+    const assistantId = (Date.now() + 1).toString();
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: input,
+      content: userInput,
       timestamp: Date.now(),
       status: 'done',
     };
@@ -49,11 +141,11 @@ export function ChatView() {
     const apiMessages = [
       { role: 'system', content: systemPrompt },
       ...messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.content })),
-      { role: 'user', content: input },
+      { role: 'user', content: userInput },
     ];
 
     const assistantMsg: ChatMessage = {
-      id: (Date.now() + 1).toString(),
+      id: assistantId,
       role: 'assistant',
       content: '',
       timestamp: Date.now(),
@@ -64,27 +156,35 @@ export function ChatView() {
     setMessages(prev => [...prev, assistantMsg]);
 
     try {
-      await chatWithModel(selectedProvider, selectedModel, apiMessages, (chunk) => {
+      let streamed = '';
+      const finalText = await chatWithModel(selectedProvider, selectedModel, apiMessages, (chunk) => {
+        streamed += chunk;
         setMessages(prev => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          updated[updated.length - 1] = { ...last, content: last.content + chunk, status: 'sending' };
-          return updated;
+          return prev.map((m) => (
+            m.id === assistantId
+              ? { ...m, content: `${m.content}${chunk}`, status: 'sending' }
+              : m
+          ));
         });
       });
       setMessages(prev => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        updated[updated.length - 1] = { ...last, status: 'done' };
-        return updated;
+        return prev.map((m) => (
+          m.id === assistantId ? { ...m, status: 'done' } : m
+        ));
       });
+      void generateFollowUps(assistantId, userInput, String(finalText || streamed || '').trim());
     } catch {
       setMessages(prev => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        updated[updated.length - 1] = { ...last, content: 'Unable to connect to AI model. Please check your provider is running.', status: 'error' };
-        return updated;
+        return prev.map((m) => (
+          m.id === assistantId
+            ? { ...m, content: 'Unable to connect to AI model. Please check your provider is running.', status: 'error' }
+            : m
+        ));
       });
+      setFollowUpByMessageId((prev) => ({
+        ...prev,
+        [assistantId]: fallbackFollowUps(userInput, 'Unable to connect to AI model.'),
+      }));
     } finally {
       setIsStreaming(false);
     }
@@ -111,6 +211,10 @@ export function ChatView() {
       .join('\n\n');
     await copyText(transcript);
   }
+
+  const latestAssistantDoneId = [...messages]
+    .reverse()
+    .find((m) => m.role === 'assistant' && m.status === 'done')?.id || null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -206,6 +310,24 @@ export function ChatView() {
                 </div>
               )}
             </div>
+            {msg.role === 'assistant' && msg.status === 'done' && msg.id === latestAssistantDoneId && (
+              <div style={{ marginTop: 6, marginLeft: 8, display: 'flex', flexWrap: 'wrap', gap: 6, maxWidth: '80%' }}>
+                {(followUpByMessageId[msg.id] || []).map((s, i) => (
+                  <button
+                    key={`${msg.id}-followup-${i}`}
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: 11 }}
+                    onClick={() => setInput(s)}
+                    title="Use this follow-up prompt"
+                  >
+                    {s}
+                  </button>
+                ))}
+                {followUpLoadingFor === msg.id && (
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Generating follow-up suggestions...</span>
+                )}
+              </div>
+            )}
           </div>
         ))}
         <div ref={messagesEndRef} />
