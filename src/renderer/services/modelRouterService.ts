@@ -90,7 +90,26 @@ class ModelRouter {
         const { model } = this.selectBestModel(taskType);
         console.log(`Trying ${providerType} with model ${model}`);
 
-        return await chatWithModel(providerType, model, messages, onChunk);
+        // 🧠 Inject Master Memory as top-level system context
+        let preparedMessages = [...messages];
+        try {
+          const memory = await (window as any).babaAPI?.memoryLoad?.();
+          if (memory && !messages.some(m => m.role === 'system')) {
+            preparedMessages = [
+              { 
+                id: 'system-memory',
+                role: 'system', 
+                content: `BABA MASTER MEMORY:\n${memory}\n\nTreat the above as primary user context.`,
+                timestamp: Date.now()
+              },
+              ...messages
+            ];
+          }
+        } catch (memErr) {
+          console.warn('Memory injection failed:', memErr);
+        }
+
+        return await chatWithModel(providerType, model, preparedMessages, onChunk);
       } catch (error) {
         console.warn(`${providerType} failed, trying next provider:`, error);
         tried.push(providerType);
@@ -122,6 +141,8 @@ export async function babaChat(
   return modelRouter.chatWithFallback(messages, 'reasoning', onChunk);
 }
 
+
+
 export async function agentChat(
   agentId: string,
   messages: ChatMessage[],
@@ -134,6 +155,13 @@ export async function agentChat(
     money: 'finance',
     organizer: 'fast',
     evolver: 'reasoning',
+    legal: 'reasoning',
+    acct: 'finance',
+    supplier: 'finance',
+    deals: 'research',
+    content: 'fast',
+    comms: 'fast',
+    pa: 'fast',
   };
 
   return modelRouter.chatWithFallback(messages, taskTypes[agentId] || 'reasoning', onChunk);

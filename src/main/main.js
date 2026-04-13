@@ -19,7 +19,6 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
-
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
@@ -161,24 +160,24 @@ function createLoopbackServer(expectedState) {
         res.end('<html><body style="font-family: system-ui; padding: 24px;"><h3>Connected</h3><p>You can close this window.</p></body></html>');
 
         if (error) {
-          try { server.close(); } catch {}
+          try { server.close(); } catch { }
           rejectCode(new Error(String(error)));
           return;
         }
         if (!code || state !== expectedState) return;
-        try { server.close(); } catch {}
+        try { server.close(); } catch { }
         resolveCode({ code: String(code) });
-      } catch {}
+      } catch { }
     });
 
     const timeout = setTimeout(() => {
-      try { server.close(); } catch {}
+      try { server.close(); } catch { }
       rejectCode(new Error('OAuth timeout'));
     }, 5 * 60 * 1000);
 
     server.on('error', (err) => {
       clearTimeout(timeout);
-      try { server.close(); } catch {}
+      try { server.close(); } catch { }
       rejectCode(err);
       reject(err);
     });
@@ -602,7 +601,7 @@ function createTray() {
       click: () => {
         isQuitting = true;
         // Close all popups cleanly
-        Object.values(popupWindows).forEach((w) => { try { w.destroy(); } catch {} });
+        Object.values(popupWindows).forEach((w) => { try { w.destroy(); } catch { } });
         popupWindows = {};
         if (mainWindow) {
           mainWindow.destroy();
@@ -629,7 +628,7 @@ app.whenReady().then(() => {
   initializeBrainPaths(app);
   initializeMasterMemory(app);
   brainIndex = new BrainIndex();
-  
+
   const isDev = !app.isPackaged && process.env.FORCE_PROD !== '1';
   createMainWindow(isDev);
   createTray();
@@ -670,14 +669,14 @@ ipcMain.handle('resize-popup', (event, windowId, dimensions) => {
 ipcMain.handle('get-system-info', () => {
   const cpus = os.cpus();
   let totalIdle = 0, totalTick = 0;
-  
+
   cpus.forEach(cpu => {
     for (const type in cpu.times) {
       totalTick += cpu.times[type];
     }
     totalIdle += cpu.times.idle;
   });
-  
+
   const idle = totalIdle / cpus.length;
   const total = totalTick / cpus.length;
   const cpuUsage = 100 - ~~(100 * idle / total);
@@ -742,7 +741,7 @@ ipcMain.handle('system:launch-app', async (event, appId) => {
     try {
       await shell.openExternal(`shell:AppsFolder\\${command}`);
       return true;
-    } catch {}
+    } catch { }
 
     const { exec } = require('child_process');
     return await new Promise((resolve) => {
@@ -785,6 +784,108 @@ ipcMain.handle('memory:load', async () => {
 
 ipcMain.handle('memory:append', async (event, text) => {
   return appendMasterMemory(text);
+});
+
+// ── MiroFish Simulation IPC handlers ──────────────────────────────
+const MIROFISH_DEFAULT_URL = 'http://localhost:8000';
+
+async function miroFishRequest(path, options = {}) {
+  const url = `${MIROFISH_DEFAULT_URL}${path}`;
+  const body = options.body ? JSON.stringify(options.body) : undefined;
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const requestOptions = {
+      hostname: urlObj.hostname,
+      port: urlObj.port,
+      path: urlObj.pathname + urlObj.search,
+      method: options.method || 'GET',
+      headers,
+      body,
+      timeout: 30000,
+    };
+
+    const req = http.request(requestOptions, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        if (!res.statusCode || res.statusCode >= 400) {
+          reject(new Error(`MiroFish API error (${res.statusCode}): ${data}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          resolve(data);
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('MiroFish request timeout')); });
+
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+ipcMain.handle('mirofish:health', async () => {
+  try {
+    const res = await miroFishRequest('/api/health');
+    return { status: 'connected', dockerRunning: true, version: res.version, lastChecked: Date.now() };
+  } catch (err) {
+    return { status: 'disconnected', dockerRunning: false, lastChecked: Date.now(), error: err.message };
+  }
+});
+
+ipcMain.handle('mirofish:create-simulation', async (event, job) => {
+  return miroFishRequest('/api/simulations', {
+    method: 'POST',
+    body: {
+      id: job.id,
+      name: job.name,
+      type: job.type,
+      input_source: job.inputSource,
+      input_content: job.inputContent,
+      agent_count: job.agentCount,
+    },
+  });
+});
+
+ipcMain.handle('mirofish:simulation-status', async (event, simulationId) => {
+  return miroFishRequest(`/api/simulations/${simulationId}/status`);
+});
+
+ipcMain.handle('mirofish:simulation-report', async (event, simulationId) => {
+  return miroFishRequest(`/api/simulations/${simulationId}/report`);
+});
+
+ipcMain.handle('mirofish:cancel-simulation', async (event, simulationId) => {
+  try {
+    await miroFishRequest(`/api/simulations/${simulationId}/cancel`, { method: 'POST' });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mirofish:list-simulations', async () => {
+  return miroFishRequest('/api/simulations');
+});
+
+ipcMain.handle('mirofish:build-graph', async (event, content, sourceType) => {
+  return miroFishRequest('/api/graph/build', {
+    method: 'POST',
+    body: { content, source_type: sourceType },
+  });
+});
+
+ipcMain.handle('mirofish:query-graph', async (event, query) => {
+  return miroFishRequest('/api/graph/query', {
+    method: 'POST',
+    body: { query },
+  });
 });
 
 ipcMain.handle('email:connect', async (event, providerId, settings) => {

@@ -25,7 +25,7 @@ export interface Provider {
 export interface Agent {
   id: string;
   name: string;
-  type: 'brain' | 'coder' | 'research' | 'money' | 'solicitor' | 'accountant' | 'organizer' | 'evolver' | 'custom';
+  type: 'brain' | 'coder' | 'research' | 'money' | 'solicitor' | 'accountant' | 'organizer' | 'evolver' | 'legal' | 'acct' | 'supplier' | 'deals' | 'content' | 'comms' | 'pa' | 'custom';
   icon: string;
   status: 'idle' | 'working' | 'error' | 'paused';
   currentTask?: string;
@@ -110,7 +110,7 @@ export interface ScheduledJob {
 
 export interface SelfEvolutionEntry {
   timestamp: string;
-  type: 'health' | 'scheduler' | 'self-correction' | 'self-evolution' | 'evidence' | 'sync' | 'model-routing' | 'agent' | 'whatsapp';
+  type: 'health' | 'scheduler' | 'self-correction' | 'self-evolution' | 'evidence' | 'sync' | 'model-routing' | 'agent' | 'whatsapp' | 'simulation';
   message: string;
 }
 
@@ -206,6 +206,76 @@ export interface Task {
   error?: string;
 }
 
+export interface MiroFishConfig {
+  baseUrl: string;
+  status: 'connected' | 'disconnected' | 'error';
+  lastChecked: number;
+  dockerRunning: boolean;
+  version?: string;
+}
+
+export interface SimulationJob {
+  id: string;
+  name: string;
+  type: 'public_reaction' | 'market_sentiment' | 'policy_outcome' | 'social_dynamics' | 'financial_forecast' | 'crisis_simulation' | 'narrative_test' | 'regulatory_impact' | 'custom';
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  inputSource: 'pdf' | 'article' | 'policy_draft' | 'financial_report' | 'scenario_text' | 'url';
+  inputContent: string;
+  agentCount: number;
+  createdAt: number;
+  startedAt?: number;
+  completedAt?: number;
+  progress: number;
+  report?: SimulationReport;
+  error?: string;
+}
+
+export interface SimulationReport {
+  id: string;
+  simulationId: string;
+  summary: string;
+  predictions: PredictionItem[];
+  sentimentDistribution: Record<string, number>;
+  keyInsights: string[];
+  riskFactors: string[];
+  opportunities: string[];
+  scenarioOutcomes: ScenarioOutcome[];
+  agentBehaviors: AgentBehaviorSummary[];
+  knowledgeGraph: KnowledgeGraphSummary;
+  createdAt: number;
+  rawReport?: any;
+}
+
+export interface PredictionItem {
+  id: string;
+  prediction: string;
+  confidence: number;
+  timeframe: string;
+  supportingEvidence: string;
+  impact: 'high' | 'medium' | 'low';
+}
+
+export interface ScenarioOutcome {
+  scenario: string;
+  probability: number;
+  description: string;
+  triggers: string[];
+}
+
+export interface AgentBehaviorSummary {
+  personaType: string;
+  behaviorPattern: string;
+  percentage: number;
+  keyActions: string[];
+}
+
+export interface KnowledgeGraphSummary {
+  entityCount: number;
+  relationshipCount: number;
+  topEntities: string[];
+  keyRelationships: string[];
+}
+
 export interface TaskAssignment {
   task: Task;
   assignedAgent: Agent;
@@ -217,8 +287,9 @@ export interface CaseHistoryEntry {
   icon: string;
 }
 
-export type SidebarView = 
-  | 'home' | 'chat' | 'advisor' | 'agents' | 'inbox' | 'organizer' 
+export type SidebarView =
+  | 'home' | 'chat' | 'advisor' | 'agents' | 'inbox' | 'organizer' | 'brain'
   | 'cases' | 'radar' | 'approvals' | 'tasks' | 'exo-triage' | 'open-exo'
   | 'kairos' | 'wiki' | 'claws' | 'self-evolving' | 'scheduler' | 'files'
-  | 'pc-control' | 'browser' | 'local-apps' | 'models' | 'providers' | 'settings' | 'voice';
+  | 'pc-control' | 'browser' | 'local-apps' | 'models' | 'providers' | 'settings' | 'voice'
+  | 'simulation';

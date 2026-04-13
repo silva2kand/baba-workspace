@@ -11,11 +11,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/renderer/*"],
-      "@shared/*": ["src/shared/*"]
+      "@/*": ["./src/renderer/*"],
+      "@shared/*": ["./src/shared/*"]
     }
   },
   "include": ["src/renderer/**/*", "src/shared/**/*"],

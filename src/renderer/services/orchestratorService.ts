@@ -1,6 +1,8 @@
-import type { Agent, Task, TaskAssignment } from '@shared/types';
+import type { Agent, Task, TaskAssignment, SimulationJob } from '@shared/types';
 import { chatWithModel } from './modelService';
 import { useAppStore } from '../stores/appStore';
+import { babaChat } from './modelRouterService';
+import { createSimulation, getSimulationReport, SIMULATION_TEMPLATES } from './mirofishService';
 
 export const BABA_AGENTS: Agent[] = [
   {
@@ -105,6 +107,29 @@ class Orchestrator {
     };
   }
 
+  assignSimulationTask(simulationConfig: {
+    name?: string;
+    type?: string;
+    inputSource?: string;
+    inputContent: string;
+    agentCount?: number;
+    templateId?: string;
+  }): Task {
+    const simulationTask: Task = {
+      id: crypto.randomUUID(),
+      agentId: 'research', // Research agent handles simulations
+      title: `[SIMULATION] ${simulationConfig.name || 'Auto Simulation'}`,
+      description: JSON.stringify(simulationConfig),
+      requiredCapabilities: ['research', 'monitoring'],
+      status: 'queued',
+      createdAt: Date.now(),
+      progress: 0,
+    };
+
+    this.taskQueue.push(simulationTask);
+    return simulationTask;
+  }
+
   selectBestAgent(requiredCapabilities: string[]): Agent {
     return this.agents
       .filter(a => requiredCapabilities.every(cap => (a.capabilities || []).includes(cap)))
@@ -156,6 +181,12 @@ class Orchestrator {
 
   private async executeAgentTask(agent: Agent, task: Task) {
     try {
+      // Check if this is a simulation task
+      if (task.title.startsWith('[SIMULATION]')) {
+        await this.executeSimulationTask(task);
+        return;
+      }
+
       // Real agent execution will happen here using assigned model
       console.log(`Agent ${agent.name} executing task: ${task.title}`);
 
@@ -166,6 +197,87 @@ class Orchestrator {
       }
 
       task.result = { success: true, output: `Completed ${task.title}` };
+    } catch (error) {
+      task.status = 'failed';
+      task.error = String(error);
+    }
+  }
+
+  private async executeSimulationTask(task: Task) {
+    try {
+      task.progress = 10;
+
+      // Parse simulation config from task description
+      const simulationConfig = task.description ? JSON.parse(task.description) : {};
+      const template = SIMULATION_TEMPLATES.find(t => t.id === simulationConfig.templateId);
+
+      const job = {
+        name: simulationConfig.name || template?.name || 'Automated Simulation',
+        type: simulationConfig.type || template?.type || 'custom',
+        inputSource: simulationConfig.inputSource || template?.inputSource || 'scenario_text',
+        inputContent: simulationConfig.inputContent || template?.inputContent || task.title,
+        agentCount: simulationConfig.agentCount || template?.agentCount || 5000,
+      };
+
+      task.progress = 30;
+
+      // Create simulation via MiroFish
+      const newSim = await createSimulation(job);
+
+      task.progress = 50;
+
+      // Poll for completion (with timeout)
+      const maxWaitTime = 10 * 60 * 1000; // 10 minutes
+      const pollInterval = 5000; // 5 seconds
+      const startTime = Date.now();
+
+      while (Date.now() - startTime < maxWaitTime) {
+        await new Promise(r => setTimeout(r, pollInterval));
+        task.progress = Math.min(90, 50 + Math.floor((Date.now() - startTime) / maxWaitTime * 40));
+
+        // Check status via the store - the SimulationView handles polling
+        const sim = useAppStore.getState().simulations.find(s => s.id === newSim.id);
+        if (sim?.status === 'completed') {
+          task.progress = 100;
+          const report = useAppStore.getState().simulationReports.find(r => r.simulationId === newSim.id);
+          task.result = {
+            success: true,
+            simulationId: newSim.id,
+            report,
+            summary: report?.summary || 'Simulation completed',
+          };
+
+          // Store in Brain Index and Master Memory
+          try {
+            if (report) {
+              await window.babaAPI.brainIngest(
+                `Simulation: ${report.summary}`,
+                'simulation',
+                JSON.stringify(report, null, 2),
+                'mirofish'
+              );
+              await window.babaAPI.memoryAppend(
+                `[Simulation Result] ${report.summary} | Key insights: ${report.keyInsights.join('; ')} | Risks: ${report.riskFactors.join('; ')}`
+              );
+              useAppStore.getState().addEvolutionEntry({
+                timestamp: new Date().toISOString(),
+                type: 'simulation',
+                message: `Simulation completed via orchestrator: ${report.summary}`,
+              });
+            }
+          } catch (err) {
+            console.error('Failed to store simulation result:', err);
+          }
+
+          return;
+        }
+
+        if (sim?.status === 'failed' || sim?.status === 'cancelled') {
+          throw new Error(`Simulation ${sim.status}`);
+        }
+      }
+
+      throw new Error('Simulation timeout');
     } catch (error) {
       task.status = 'failed';
       task.error = String(error);
@@ -207,10 +319,12 @@ class Orchestrator {
 
 export const babaOrchestrator = new Orchestrator();
 
+
 export async function chatWithBaba(
   messages: Array<{ role: string; content: string }>,
   onChunk?: (text: string) => void
 ): Promise<string> {
-  // Baba automatically routes to best model based on query
-  return chatWithModel('ollama', 'qwen3.5:latest', messages, onChunk);
+  // Use the unified router instead of hardcoded Ollama. 
+  // This enables Master Memory injection and automatic failover.
+  return babaChat(messages as any, onChunk);
 }

@@ -109,7 +109,14 @@ RULES:
 - Always end with "Awaiting your approval before any action"
 Format: Findings / Risks / Opportunities / Recommended Actions (all marked requires approval)`;
 
-export async function runAgent(agentId, task, brainStats, provider, model, callAiFn) {
+export async function runAgent(
+  agentId: string, 
+  task: string, 
+  brainStats: any, 
+  provider: string, 
+  model: string, 
+  callAiFn: (p: string, m: string, msgs: any[], sys: string, max: number) => Promise<string>
+) {
   const info = AGENTS.find(a => a.id === agentId) || { name: agentId, id: agentId };
   const role = AGENTS.find(a => a.id === agentId)?.role || "General business analysis";
   

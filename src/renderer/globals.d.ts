@@ -23,5 +23,25 @@ interface Window {
     emailDisconnect: (providerId: 'outlook' | 'gmail') => Promise<boolean>;
     emailSend: (providerId: 'outlook' | 'gmail', payload: any) => Promise<{ ok: boolean }>;
     emailMarkRead: (providerId: 'outlook' | 'gmail', payload: any) => Promise<{ ok: boolean }>;
+
+    // Brain Index API
+    brainIngest: (title: string, category: string, content: string, source: string) => Promise<number>;
+    brainSearch: (query: string) => Promise<any[]>;
+    brainStats: () => Promise<any>;
+    brainRecent: (n: number) => Promise<any[]>;
+
+    // Master Memory API
+    memoryLoad: () => Promise<string>;
+    memoryAppend: (text: string) => Promise<boolean>;
+
+    // MiroFish Simulation API
+    miroFishHealth: () => Promise<any>;
+    miroFishCreateSimulation: (job: any) => Promise<any>;
+    miroFishSimulationStatus: (simulationId: string) => Promise<any>;
+    miroFishSimulationReport: (simulationId: string) => Promise<any>;
+    miroFishCancelSimulation: (simulationId: string) => Promise<any>;
+    miroFishListSimulations: () => Promise<any>;
+    miroFishBuildGraph: (content: string, sourceType: string) => Promise<any>;
+    miroFishQueryGraph: (query: string) => Promise<any>;
   };
 }

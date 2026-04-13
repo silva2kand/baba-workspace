@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { scanAllProviders } from '../../services/modelService';
+import { scanAllProviders, chatWithModel } from '../../services/modelService';
 
 export function ModelsView() {
   const providers = useAppStore((s) => s.providers);
@@ -32,7 +32,6 @@ export function ModelsView() {
   async function testModel(providerId: string, modelName: string) {
     setTestingModel(modelName);
     try {
-      const { chatWithModel } = await import('../../services/modelService');
       const response = await chatWithModel(providerId, modelName, [
         { role: 'user', content: 'Say "Hello from Baba!" in one sentence.' }
       ]);

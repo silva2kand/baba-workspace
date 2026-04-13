@@ -29,6 +29,8 @@ import { PCControlView } from './components/common/PCControlView';
 import { BrowserView } from './components/common/BrowserView';
 import { ModelsView } from './components/common/ModelsView';
 import { OpenExoView } from './components/common/OpenExoView';
+import { BrainView } from './components/common/BrainView';
+import { SimulationView } from './components/common/SimulationView';
 import { PopupManager } from './components/common/PopupManager';
 import { syncAndOrganize } from './services/emailService';
 
@@ -65,6 +67,7 @@ const viewMap: Record<string, React.FC> = {
   chat: ChatView,
   advisor: AdvisorView,
   agents: AgentsView,
+  brain: BrainView,
   inbox: InboxView,
   organizer: OrganizerView,
   cases: CasesView,
@@ -86,6 +89,7 @@ const viewMap: Record<string, React.FC> = {
   providers: ProvidersView,
   settings: SettingsView,
   voice: VoiceView,
+  simulation: SimulationView,
 };
 
 export default function App() {

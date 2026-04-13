@@ -29,14 +29,24 @@ contextBridge.exposeInMainWorld('babaAPI', {
   emailDisconnect: (providerId) => ipcRenderer.invoke('email:disconnect', providerId),
   emailSend: (providerId, payload) => ipcRenderer.invoke('email:send', providerId, payload),
   emailMarkRead: (providerId, payload) => ipcRenderer.invoke('email:mark-read', providerId, payload),
-  
+
   // Brain Index API
   brainIngest: (title, category, content, source) => ipcRenderer.invoke('brain:ingest', title, category, content, source),
   brainSearch: (query) => ipcRenderer.invoke('brain:search', query),
   brainStats: () => ipcRenderer.invoke('brain:stats'),
   brainRecent: (n) => ipcRenderer.invoke('brain:recent', n),
-  
+
   // Master Memory API
   memoryLoad: () => ipcRenderer.invoke('memory:load'),
   memoryAppend: (text) => ipcRenderer.invoke('memory:append', text),
+
+  // MiroFish Simulation API
+  miroFishHealth: () => ipcRenderer.invoke('mirofish:health'),
+  miroFishCreateSimulation: (job) => ipcRenderer.invoke('mirofish:create-simulation', job),
+  miroFishSimulationStatus: (simulationId) => ipcRenderer.invoke('mirofish:simulation-status', simulationId),
+  miroFishSimulationReport: (simulationId) => ipcRenderer.invoke('mirofish:simulation-report', simulationId),
+  miroFishCancelSimulation: (simulationId) => ipcRenderer.invoke('mirofish:cancel-simulation', simulationId),
+  miroFishListSimulations: () => ipcRenderer.invoke('mirofish:list-simulations'),
+  miroFishBuildGraph: (content, sourceType) => ipcRenderer.invoke('mirofish:build-graph', content, sourceType),
+  miroFishQueryGraph: (query) => ipcRenderer.invoke('mirofish:query-graph', query),
 });

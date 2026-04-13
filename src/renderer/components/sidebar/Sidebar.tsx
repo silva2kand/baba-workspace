@@ -2,38 +2,48 @@ import React from 'react';
 import { useAppStore } from '../../stores/appStore';
 
 const navItems = [
-  { section: 'CORE', items: [
-    { id: 'home' as const, label: 'Home', icon: '🏠' },
-    { id: 'chat' as const, label: 'Chat', icon: '💬' },
-    { id: 'advisor' as const, label: 'Advisor', icon: '🧭' },
-    { id: 'agents' as const, label: 'Agents', icon: '🤖', badge: 4 },
-  ]},
-  { section: 'INTELLIGENCE', items: [
-    { id: 'inbox' as const, label: 'Inbox', icon: '📥', badge: 86 },
-    { id: 'organizer' as const, label: 'Organizer', icon: '🗂️' },
-    { id: 'cases' as const, label: 'Cases', icon: '📋', badge: 80 },
-    { id: 'radar' as const, label: 'Radar', icon: '📡', badge: 5 },
-    { id: 'approvals' as const, label: 'Approvals', icon: '✅' },
-    { id: 'tasks' as const, label: 'Tasks', icon: '📝' },
-  ]},
-  { section: 'OPERATIONS', items: [
-    { id: 'exo-triage' as const, label: 'Exo Triage', icon: '⚡' },
-    { id: 'open-exo' as const, label: 'Open Exo', icon: '🔓' },
-    { id: 'kairos' as const, label: 'Kairos', icon: '⏳' },
-    { id: 'wiki' as const, label: 'Wiki', icon: '📚' },
-    { id: 'claws' as const, label: 'Claws', icon: '🦅' },
-    { id: 'self-evolving' as const, label: 'Self-Evolving', icon: '🧬' },
-  ]},
-  { section: 'SYSTEM', items: [
-    { id: 'scheduler' as const, label: 'Scheduler', icon: '⏰' },
-    { id: 'files' as const, label: 'Files', icon: '📁' },
-    { id: 'pc-control' as const, label: 'PC Control', icon: '🖥️' },
-    { id: 'browser' as const, label: 'Browser', icon: '🌐' },
-    { id: 'local-apps' as const, label: 'Local Apps', icon: '📱' },
-    { id: 'models' as const, label: 'Models', icon: '🧠' },
-    { id: 'providers' as const, label: 'Providers', icon: '🔌' },
-    { id: 'settings' as const, label: 'Settings', icon: '⚙️' },
-  ]},
+  {
+    section: 'CORE', items: [
+      { id: 'home' as const, label: 'Home', icon: '🏠' },
+      { id: 'chat' as const, label: 'Chat', icon: '💬' },
+      { id: 'advisor' as const, label: 'Advisor', icon: '🧭' },
+      { id: 'agents' as const, label: 'Agents', icon: '🤖', badge: 4 },
+    ]
+  },
+  {
+    section: 'INTELLIGENCE', items: [
+      { id: 'inbox' as const, label: 'Inbox', icon: '📥', badge: 86 },
+      { id: 'brain' as const, label: 'Brain Index', icon: '🧠' },
+      { id: 'organizer' as const, label: 'Organizer', icon: '🗂️' },
+      { id: 'cases' as const, label: 'Cases', icon: '📋', badge: 80 },
+      { id: 'radar' as const, label: 'Radar', icon: '📡', badge: 5 },
+      { id: 'approvals' as const, label: 'Approvals', icon: '✅' },
+      { id: 'tasks' as const, label: 'Tasks', icon: '📝' },
+    ]
+  },
+  {
+    section: 'OPERATIONS', items: [
+      { id: 'exo-triage' as const, label: 'Exo Triage', icon: '⚡' },
+      { id: 'open-exo' as const, label: 'Open Exo', icon: '🔓' },
+      { id: 'kairos' as const, label: 'Kairos', icon: '⏳' },
+      { id: 'wiki' as const, label: 'Wiki', icon: '📚' },
+      { id: 'claws' as const, label: 'Claws', icon: '🦅' },
+      { id: 'self-evolving' as const, label: 'Self-Evolving', icon: '🧬' },
+      { id: 'simulation' as const, label: 'Simulations', icon: '🐟' },
+    ]
+  },
+  {
+    section: 'SYSTEM', items: [
+      { id: 'scheduler' as const, label: 'Scheduler', icon: '⏰' },
+      { id: 'files' as const, label: 'Files', icon: '📁' },
+      { id: 'pc-control' as const, label: 'PC Control', icon: '🖥️' },
+      { id: 'browser' as const, label: 'Browser', icon: '🌐' },
+      { id: 'local-apps' as const, label: 'Local Apps', icon: '📱' },
+      { id: 'models' as const, label: 'Models', icon: '🧠' },
+      { id: 'providers' as const, label: 'Providers', icon: '🔌' },
+      { id: 'settings' as const, label: 'Settings', icon: '⚙️' },
+    ]
+  },
 ];
 
 export function Sidebar() {

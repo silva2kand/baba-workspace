@@ -1,4 +1,4 @@
-import sqlite3 from 'node:sqlite3';
+import sqlite3 from 'sqlite3';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
