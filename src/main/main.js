@@ -594,6 +594,34 @@ function isAllowedFsPath(targetPath) {
   return roots.some((root) => isPathWithin(root, targetPath));
 }
 
+function resolveDesktopShortcutTarget() {
+  if (app.isPackaged) {
+    return {
+      target: process.execPath,
+      args: '',
+      icon: process.execPath,
+      workingDirectory: path.dirname(process.execPath),
+    };
+  }
+
+  const packagedExe = path.join(process.cwd(), 'release', 'win-unpacked', 'baba-workspace.exe');
+  if (fs.existsSync(packagedExe)) {
+    return {
+      target: packagedExe,
+      args: '',
+      icon: packagedExe,
+      workingDirectory: path.dirname(packagedExe),
+    };
+  }
+
+  return {
+    target: process.execPath,
+    args: `"${process.cwd()}"`,
+    icon: process.execPath,
+    workingDirectory: process.cwd(),
+  };
+}
+
 // ── Main window ─────────────────────────────────────────────────
 function createMainWindow(isDev) {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
@@ -907,6 +935,41 @@ ipcMain.handle('system:open-path', async (event, targetPath) => {
     return errText === '';
   } catch {
     return false;
+  }
+});
+
+ipcMain.handle('system:create-desktop-shortcut', async () => {
+  if (process.platform !== 'win32') {
+    return { ok: false, error: 'Desktop shortcut is supported on Windows only.' };
+  }
+
+  try {
+    const shortcutPath = path.join(app.getPath('desktop'), 'Baba Workspace.lnk');
+    const target = resolveDesktopShortcutTarget();
+    const options = {
+      target: target.target,
+      args: target.args,
+      cwd: target.workingDirectory,
+      description: 'Baba Workspace',
+      icon: target.icon,
+      iconIndex: 0,
+      appUserModelId: 'com.silva.baba-workspace',
+    };
+
+    const created = shell.writeShortcutLink(shortcutPath, 'create', options)
+      || shell.writeShortcutLink(shortcutPath, 'update', options);
+
+    if (!created) {
+      return { ok: false, error: 'Failed to create desktop shortcut.' };
+    }
+
+    return {
+      ok: true,
+      path: shortcutPath,
+      target: target.target,
+    };
+  } catch (err) {
+    return { ok: false, error: String(err) };
   }
 });
 

@@ -1,25 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { scanAllProviders, chatWithModel } from '../../services/modelService';
+import { chatWithModel } from '../../services/modelService';
+import { notify } from '../../services/notificationService';
+import { createDesktopShortcut } from '../../services/systemIntegrationService';
+import { copyText, speakText } from '../../services/assistantActions';
 
 export function HomeView() {
   const username = useAppStore((s) => s.username);
   const agents = useAppStore((s) => s.agents);
   const emailScanProgress = useAppStore((s) => s.emailScanProgress);
   const organizedEmails = useAppStore((s) => s.organizedEmails);
+  const emails = useAppStore((s) => s.emails);
+  const tasks = useAppStore((s) => s.tasks);
+  const approvals = useAppStore((s) => s.approvals);
+  const notifications = useAppStore((s) => s.notifications);
   const evolutionLog = useAppStore((s) => s.evolutionLog);
   const systemStatus = useAppStore((s) => s.systemStatus);
   const selectedProvider = useAppStore((s) => s.selectedProvider);
   const selectedModel = useAppStore((s) => s.selectedModel);
   const setCurrentView = useAppStore((s) => s.setCurrentView);
-  const addEvolutionEntry = useAppStore((s) => s.addEvolutionEntry);
   const [mode, setMode] = useState('Life');
   const [chatInput, setChatInput] = useState('');
   const [chatResponse, setChatResponse] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
 
   const modes = ['Life', 'Write', 'Cases', 'Mail', 'Radar', 'Automate'];
-  const workingAgents = agents.filter(a => a.status === 'working');
+  const workingAgents = agents.filter((a) => a.status === 'working');
+  const urgentInboxCount = emails.filter((e) => !e.isRead && (e.priority === 'urgent' || e.priority === 'high')).length;
+  const queuedOrRunningTasks = tasks.filter((t) => t.status === 'queued' || t.status === 'running').length;
+  const runningTasks = tasks.filter((t) => t.status === 'running').length;
+  const radarLikeAlerts = notifications.filter((n) => n.type === 'warning' || n.type === 'error').length;
+  const pendingApprovals = approvals.filter((a) => a.status === 'pending').length;
 
   const greeting = () => {
     const h = new Date().getHours();
@@ -38,30 +49,37 @@ export function HomeView() {
         { role: 'user', content: chatInput },
       ];
       const response = await chatWithModel(selectedProvider, selectedModel, messages, (chunk) => {
-        setChatResponse(prev => prev + chunk);
+        setChatResponse((prev) => prev + chunk);
       });
       if (!chatResponse && response) setChatResponse(response);
-    } catch (err) {
+    } catch {
       setChatResponse('Unable to connect to AI. Please check your model provider is running.');
     } finally {
       setChatLoading(false);
     }
   }
 
+  async function handleCreateDesktopShortcut() {
+    const result = await createDesktopShortcut();
+    if (result.ok) {
+      await notify.success('Desktop Shortcut Created', `Shortcut saved to ${result.path || 'desktop'}.`, { onClickTarget: 'home' });
+      return;
+    }
+    await notify.error('Shortcut Creation Failed', result.error || 'Unable to create desktop shortcut.');
+  }
+
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      {/* Greeting */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
           {greeting()}, {username} 👋
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-          Baba is orchestrating {workingAgents.length} agents. 
+          Baba is orchestrating {workingAgents.length} agents.
           {evolutionLog.length > 0 && ` System self-evolved ${evolutionLog[0]?.timestamp || 'recently'}.`}
         </p>
       </div>
 
-      {/* Ask Anything */}
       <div className="card" style={{ marginBottom: 20, padding: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: 'var(--text-primary)' }}>
           How can I help you today?
@@ -79,9 +97,9 @@ export function HomeView() {
             {chatLoading ? '⟳' : '➤'} Send
           </button>
         </div>
-        {/* Mode Chips */}
+
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {modes.map(m => (
+          {modes.map((m) => (
             <button
               key={m}
               className={`chip ${mode === m ? 'chip-active' : ''}`}
@@ -91,31 +109,36 @@ export function HomeView() {
             </button>
           ))}
         </div>
-        {/* AI Response */}
+
         {chatResponse && (
           <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-accent)', marginBottom: 4 }}>Baba AI ({selectedModel})</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-accent)' }}>Baba AI ({selectedModel})</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => { void copyText(chatResponse); }} style={{ fontSize: 10, padding: '2px 6px' }}>Copy</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => speakText(chatResponse)} style={{ fontSize: 10, padding: '2px 6px' }}>Speak</button>
+              </div>
+            </div>
             {chatResponse}
           </div>
         )}
       </div>
 
-      {/* Quick Actions */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <button className="btn btn-secondary" onClick={() => setCurrentView('inbox')}>📥 Open quick panel</button>
         <button className="btn btn-secondary" onClick={() => setCurrentView('cases')}>📋 Start focused work</button>
         <button className="btn btn-secondary" onClick={() => setCurrentView('radar')}>📡 Check radar signals</button>
         <button className="btn btn-secondary" onClick={() => setCurrentView('chat')}>💬 Voice mode</button>
+        <button className="btn btn-secondary" onClick={handleCreateDesktopShortcut}>🖥 Create desktop shortcut</button>
       </div>
 
-      {/* Summary Widgets */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Urgent Inbox', value: '86', sub: 'across 2 accounts', color: 'var(--accent-red)', icon: '📥', view: 'inbox' },
-          { label: 'Active Cases', value: '80', sub: '12 high priority', color: 'var(--accent-purple)', icon: '📋', view: 'cases' },
-          { label: 'Radar Alerts', value: '5', sub: '2 deadlines this week', color: 'var(--accent-orange)', icon: '📡', view: 'radar' },
-          { label: 'Scheduled Jobs', value: '7', sub: '3 running now', color: 'var(--accent-cyan)', icon: '⏰', view: 'scheduler' },
-        ].map(w => (
+          { label: 'Urgent Inbox', value: String(urgentInboxCount), sub: `${emails.length} total emails`, color: 'var(--accent-red)', icon: '📥', view: 'inbox' },
+          { label: 'Active Cases', value: String(pendingApprovals), sub: `${approvals.length} approvals tracked`, color: 'var(--accent-purple)', icon: '📋', view: 'cases' },
+          { label: 'Radar Alerts', value: String(radarLikeAlerts), sub: `${notifications.length} notifications tracked`, color: 'var(--accent-orange)', icon: '📡', view: 'radar' },
+          { label: 'Scheduled Jobs', value: String(Math.max(systemStatus.scheduler.running, runningTasks)), sub: `${queuedOrRunningTasks} queued/running tasks`, color: 'var(--accent-cyan)', icon: '⏰', view: 'scheduler' },
+        ].map((w) => (
           <div
             key={w.label}
             className="card card-clickable"
@@ -134,7 +157,6 @@ export function HomeView() {
         ))}
       </div>
 
-      {/* Email Scan Progress */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 600 }}>Email Scan Progress</div>
@@ -157,7 +179,6 @@ export function HomeView() {
         </div>
       </div>
 
-      {/* Organized Emails */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 600 }}>Organized Emails</div>
@@ -170,17 +191,16 @@ export function HomeView() {
           }}>
             <span className="badge" style={{ background: email.categoryColor, fontSize: 9 }}>{email.category}</span>
             <span style={{ flex: 1, fontSize: 12 }}>
-              <strong>{email.sender}</strong> — {email.subject}
+              <strong>{email.sender}</strong> - {email.subject}
             </span>
           </div>
         ))}
       </div>
 
-      {/* Active Agents */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Active Agents</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-          {agents.filter(a => a.status === 'working').map(agent => (
+          {agents.filter((a) => a.status === 'working').map((agent) => (
             <div key={agent.id} style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: 8, background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)',
@@ -196,14 +216,13 @@ export function HomeView() {
         </div>
       </div>
 
-      {/* Self-Evolution Log */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Self-Evolution Log</div>
         {[
-          { time: '10:53:47 AM', msg: 'WhatsApp integration sync: 3 new messages parsed.', type: 'whatsapp' },
-          { time: '10:20 AM', msg: 'Adjusted prompt for Coder Agent', type: 'self-correction' },
-          { time: '10:18 AM', msg: 'Rerouted to Opus-Distill model', type: 'model-routing' },
-          { time: '10:15 AM', msg: 'Agent sync completed', type: 'agent' },
+          { time: '10:53:47 AM', msg: 'WhatsApp integration sync: 3 new messages parsed.' },
+          { time: '10:20 AM', msg: 'Adjusted prompt for Coder Agent' },
+          { time: '10:18 AM', msg: 'Rerouted to Opus-Distill model' },
+          { time: '10:15 AM', msg: 'Agent sync completed' },
         ].map((entry, i) => (
           <div key={i} style={{
             display: 'flex', gap: 8, padding: '6px 0',
@@ -216,7 +235,6 @@ export function HomeView() {
         ))}
       </div>
 
-      {/* Quick Context */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="card">
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Today's Focus</div>

@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('babaAPI', {
   launchApp: (appId) => ipcRenderer.invoke('system:launch-app', appId),
   openUrl: (url) => ipcRenderer.invoke('system:open-url', url),
   openPath: (targetPath) => ipcRenderer.invoke('system:open-path', targetPath),
+  createDesktopShortcut: () => ipcRenderer.invoke('system:create-desktop-shortcut'),
   storeLoad: () => ipcRenderer.invoke('system:store-load'),
   storeSave: (data) => ipcRenderer.invoke('system:store-save', data),
   storeFieldGet: (fieldName) => ipcRenderer.invoke('system:store-field-get', fieldName),

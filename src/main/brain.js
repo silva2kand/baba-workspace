@@ -105,34 +105,179 @@ export class BrainIndex {
 // Master Memory system
 let MASTER_MEMORY_PATH;
 let _masterMemoryCache = { mtime: null, text: "" };
+const MASTER_MEMORY_SEED_VERSION = '2026-04-13';
+const MASTER_MEMORY_SEED_MARKER = `SEED VERSION: ${MASTER_MEMORY_SEED_VERSION}`;
+const MASTER_MEMORY_BASE_TEMPLATE = `# BABA - MASTER ORGANISED INDEX
+SEED VERSION: 2026-04-13
+Memory | Skills | Knowledges - Complete, Additive, Always Updated
+
+MEMORY (Silva Profile)
+
+Identity Core
+- Current legal name: Silva Kandasamy
+- Previous names: Shiva Kandasamy (2010-2024), Siyanthan Kandasamy (pre-2010)
+- Residence: UK, Lancaster area
+- Primary address: Newton Newsagent, 3 Langdale Place, Lancaster, LA1 3NS
+
+Properties Portfolio
+- 3 Langdale Place: home + business
+- 6F Steamer Street: rented out
+- 16 Howlish View: deposit dispute
+
+Business Entity
+- Silva Retail Ltd (trading as Newton Newsagent)
+
+Memory Architecture
+- identity
+- semantic
+- episodic (emails, documents, finance, property, business, tasks)
+- procedural
+- preferences
+- goals
+- tools
+- emails
+- documents
+- finance
+- property
+- business
+- tasks
+
+Memory Rules
+- Always add memory on top of existing memory
+- Never reset or overwrite unless Silva explicitly asks
+- Grow memory every day and every task
+- Keep memory updated automatically
+
+SKILLS (Baba Capability Pack)
+
+Core Claws
+- NemoClaw: deep reasoning and long-chain analysis
+- CashClaw: money opportunities and profit estimation
+- AbacusClaw: numbers, risk, forecasting
+- MiroFish: swarm simulation and future scenario testing
+- MemoryVault: long-term identity and semantic recall
+- OperatorCore: PC, web, and app automation
+- VoiceCore: speech pipeline support
+
+10-Head MoE Experts
+- Strategy
+- Technical
+- Security
+- Product
+- Data
+- Risk
+- Operations
+- Experience
+- Compliance
+- Automation
+
+Silva Custom Skill Pack
+- silva-mission-control
+- silva-full-system-operator
+- silva-local-model-switchboard
+- silva-memory-vault
+- silva-browser-agent
+- silva-pc-operator
+- silva-email-agent
+- silva-file-docs-agent
+- silva-vision-lab
+- silva-voice-pipeline
+- silva-devops
+- silva-deep-research
+- silva-accounting
+- silva-uk-legal
+- silva-safety-governor
+- silva-content-studio
+- silva-cctv-ops
+- silva-audio-studio
+- silva-pos-watch
+- silva-pm-vault
+
+Agent Roles
+- Watchers
+- Workers
+- Planners
+- Sentinels
+- Coder
+- Reviewer
+- Tester
+- Researcher
+- Architect
+- Investigator
+- Risk Analyst
+- Opportunity Scanner
+- Document Parser
+- Email Handler
+- Voice Agent
+- Browser Agent
+- PC Operator
+- Automation Engineer
+- Content Creator
+- Compliance Checker
+- Strategy Advisor
+- Data Analyst
+- Mission Control Coordinator
+
+KNOWLEDGES (Baba Domain Stack)
+
+Model Stack
+- ReasoningCore: Llama-3.1-8B
+- CodeCore: Qwen2.5-Coder-14B
+- VisionCore: Qwen2.5-VL-7B (OCR enabled)
+
+System Stack
+- CoWork OS (daemon, heartbeat, SQLite, secure settings)
+- Jan (primary), Ollama, LM Studio
+- Local-first providers by default
+
+Open Integrations (Additive)
+- MiroFish -> SimulationCore
+- DeepAgents -> DeepAgentCore
+- The Agency -> AgencyCore
+- ContextHub -> ContextCore
+- OpenDataLoader -> DataCore
+
+Domain Knowledge
+- UK legal-style reasoning (non-professional guidance)
+- Accounting-style analysis
+- Business strategy and opportunity scanning
+- Investigation and cross-examination
+- Property and finance reasoning
+- Retail and POS operations
+- Content production (video/audio)
+- Automation and DevOps
+- Supplier and wholesaler intelligence
+- Email intelligence and OCR
+
+Cognitive Behaviours
+- Research -> Analyse -> Investigate -> Cross-examine -> Auto-chain -> Multi-pass reasoning -> Team-mode -> Self-improve
+- Activate full MoE for complex or multi-domain tasks
+- Universal activation across domains
+- Auto safe-mode for money/payment-sensitive tasks
+
+NO-GAP VERIFICATION
+- Handle any safe, legal, technically possible task
+- Keep all layers additive
+- Maintain continuous memory growth and improvement
+`;
 
 export function initializeMasterMemory(app) {
   MASTER_MEMORY_PATH = path.join(app.getPath('userData'), 'baba_master_memory.txt');
   
   if (!fs.existsSync(MASTER_MEMORY_PATH)) {
-    const defaultTemplate = `# BABA - MASTER ORGANISED INDEX
-Memory | Skills | Knowledges - Additive, No Overwrite
+    fs.writeFileSync(MASTER_MEMORY_PATH, `${MASTER_MEMORY_BASE_TEMPLATE.trim()}\n`, 'utf8');
+    return;
+  }
 
-Identity:
-- Current legal name: Silva Kandasamy
-- Previous names: Shiva Kandasamy (2010-2024), Siyanthan Kandasamy (pre-2010)
-- Residence: UK (Lancaster area)
-- Primary address: Newton Newsagent, 3 Langdale Place, Lancaster, LA1 3NS
-
-Properties:
-- 3 Langdale Place (home + business)
-- 6F Steamer Street (rented)
-- 16 Howlish View (deposit dispute)
-
-Business:
-- Silva Retail Ltd (trading as Newton Newsagent)
-
-Memory Rules:
-- Always append on top of existing memory
-- Never reset/overwrite unless Silva explicitly asks
-- Keep memory updated continuously
-`;
-    fs.writeFileSync(MASTER_MEMORY_PATH, defaultTemplate, 'utf8');
+  // Migration: append canonical seed once for existing installs.
+  try {
+    const current = fs.readFileSync(MASTER_MEMORY_PATH, 'utf8');
+    if (!current.includes(MASTER_MEMORY_SEED_MARKER)) {
+      const separator = current.trim() ? '\n\n' : '';
+      fs.appendFileSync(MASTER_MEMORY_PATH, `${separator}${MASTER_MEMORY_BASE_TEMPLATE.trim()}\n`, 'utf8');
+    }
+  } catch {
+    // Ignore migration errors; load/append functions handle runtime fallback.
   }
 }
 

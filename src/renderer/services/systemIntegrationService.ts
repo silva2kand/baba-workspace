@@ -115,6 +115,17 @@ export async function sendDesktopNotification(title: string, body: string) {
   }
 }
 
+export async function createDesktopShortcut(): Promise<{ ok: boolean; path?: string; target?: string; error?: string }> {
+  try {
+    const result = await window.babaAPI?.createDesktopShortcut?.();
+    if (!result) return { ok: false, error: 'Desktop shortcut API unavailable.' };
+    return result;
+  } catch (err) {
+    console.error('createDesktopShortcut failed:', err);
+    return { ok: false, error: String(err) };
+  }
+}
+
 export async function checkProviderHealth(providerId: string): Promise<{ healthy: boolean; latency: number; message?: string }> {
   const start = Date.now();
   const healthChecks: Record<string, () => Promise<boolean>> = {

@@ -5,6 +5,8 @@ export function Footer() {
   const systemStatus = useAppStore((s) => s.systemStatus);
   const emailScanProgress = useAppStore((s) => s.emailScanProgress);
   const agents = useAppStore((s) => s.agents);
+  const notifications = useAppStore((s) => s.notifications);
+  const unreadNotificationCount = useAppStore((s) => s.unreadNotificationCount);
   const [time, setTime] = React.useState(new Date());
 
   React.useEffect(() => {
@@ -13,6 +15,8 @@ export function Footer() {
   }, []);
 
   const workingAgents = agents.filter(a => a.status === 'working').length;
+  const health = systemStatus.sync.errors > 0 ? 'Degraded' : 'Healthy';
+  const healthDotClass = systemStatus.sync.errors > 0 ? 'status-dot status-dot-red' : 'status-dot status-dot-green';
 
   return (
     <footer style={{
@@ -29,8 +33,8 @@ export function Footer() {
       {/* Left - Status */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span className="status-dot status-dot-green" />
-          <span>Healthy</span>
+          <span className={healthDotClass} />
+          <span>{health}</span>
         </div>
         <span>⚖️ Solicitor: {systemStatus.solicitor.urgent}</span>
         <span>📊 Accountant: {systemStatus.accountant.urgent}</span>
@@ -62,7 +66,7 @@ export function Footer() {
           ❌ {systemStatus.sync.errors} errors
         </span>
         <span>
-          🔔 3 notifs
+          🔔 {unreadNotificationCount} unread / {notifications.length} total
         </span>
         <span>
           {time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}

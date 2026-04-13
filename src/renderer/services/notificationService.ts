@@ -119,17 +119,18 @@ export function setupNotificationListeners(): () => void {
       const state = useAppStore.getState();
       const record = state.notifications.find((n) => n.id === data.id);
       if (record) {
-        queueNotificationForAI(record);
+        openNotificationInAI(record);
         state.markNotificationsRead([record.id]);
+      } else if (data.target) {
+        state.setChatDraft([
+          'Help me handle this notification.',
+          `Context view: ${data.target}`,
+          'Please draft the best next message/action for me.',
+        ].join('\n'));
+        state.setCurrentView('chat');
       }
       if (data.id) {
         void window.babaAPI?.notifyMarkRead?.([data.id]);
-      }
-
-      // Navigate to the target view when a notification is clicked
-      const target = data.target;
-      if (target) {
-        state.setCurrentView(target as any);
       }
     };
     const unsubscribe = window.babaAPI.onNotificationClick(handler);

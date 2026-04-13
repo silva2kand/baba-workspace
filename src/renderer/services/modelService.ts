@@ -3,6 +3,7 @@ import type { LocalModel, Provider } from '@shared/types';
 const OLLAMA_URL = 'http://localhost:11434';
 const LMSTUDIO_URL = 'http://localhost:1234';
 const JAN_URL = 'http://localhost:1337';
+const MASTER_MEMORY_MAX_CHARS = 12000;
 
 // ── Scan deduplication ────────────────────────────────────────────
 // Prevents concurrent scans and enforces a 60-second result cache
@@ -28,6 +29,43 @@ async function checkLatency(url: string): Promise<number> {
     return Date.now() - start;
   } catch {
     return -1;
+  }
+}
+
+async function injectMasterMemory(messages: Array<{ role: string; content: string }>): Promise<Array<{ role: string; content: string }>> {
+  try {
+    const loader = window.babaAPI?.memoryLoad;
+    if (typeof loader !== 'function') return messages;
+
+    const rawMemory = String(await loader() || '').trim();
+    if (!rawMemory) return messages;
+
+    const clippedMemory = rawMemory.length > MASTER_MEMORY_MAX_CHARS
+      ? rawMemory.slice(rawMemory.length - MASTER_MEMORY_MAX_CHARS)
+      : rawMemory;
+
+    const memoryPrefix = [
+      'BABA MASTER MEMORY (persistent, local-first, additive-only):',
+      '- Treat this as operator-grade context for Silva.',
+      '- Do not overwrite memory; only extend additively when approved.',
+      '',
+      clippedMemory,
+    ].join('\n');
+
+    const next = [...messages];
+    const systemIndex = next.findIndex((m) => m.role === 'system');
+    if (systemIndex >= 0) {
+      const original = String(next[systemIndex].content || '').trim();
+      next[systemIndex] = {
+        ...next[systemIndex],
+        content: `${memoryPrefix}\n\n${original}`.trim(),
+      };
+      return next;
+    }
+
+    return [{ role: 'system', content: memoryPrefix }, ...next];
+  } catch {
+    return messages;
   }
 }
 
@@ -163,10 +201,11 @@ export async function chatWithModel(
   const url = urlMap[provider];
   if (!url) throw new Error(`Unknown provider: ${provider}`);
 
+  const mergedMessages = await injectMasterMemory(messages);
   const isOllama = provider === 'ollama';
   const body = isOllama
-    ? { model, messages, stream: true }
-    : { model, messages, stream: true, max_tokens: 4096 };
+    ? { model, messages: mergedMessages, stream: true }
+    : { model, messages: mergedMessages, stream: true, max_tokens: 4096 };
 
   const response = await fetch(url, {
     method: 'POST',
