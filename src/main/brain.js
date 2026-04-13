@@ -40,7 +40,7 @@ export class BrainIndex {
     return new Promise((resolve, reject) => {
       this.conn.run(
         "INSERT INTO items (title,category,source,content) VALUES (?,?,?,?)",
-        [title, category, source, content.substring(0, 50000)],
+        [title, category, source, String(content || '').substring(0, 50000)],
         function(err) {
           if (err) reject(err);
           else resolve(this.lastID);
@@ -62,7 +62,7 @@ export class BrainIndex {
             title: r.title,
             category: r.category,
             source: r.source,
-            content: r.content.substring(0, 400),
+            content: String(r.content || '').substring(0, 400),
             created_at: r.created_at
           })));
         }

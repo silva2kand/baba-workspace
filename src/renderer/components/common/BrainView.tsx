@@ -14,6 +14,16 @@ interface BrainItem {
   created_at: string;
 }
 
+function toPreviewText(value: unknown, max = 200): string {
+  if (typeof value === 'string') return value.slice(0, max);
+  if (value == null) return '';
+  try {
+    return JSON.stringify(value).slice(0, max);
+  } catch {
+    return String(value).slice(0, max);
+  }
+}
+
 export function BrainView() {
   const [stats, setStats] = useState<BrainStats>({ total: 0, byCategory: {} });
   const [items, setItems] = useState<BrainItem[]>([]);
@@ -128,14 +138,14 @@ async function loadStats() {
             <div style={{ color: 'var(--text-muted)' }}>No items in brain index yet</div>
           </div>
         ) : (
-          items.map((item) => (
-            <div key={item.id} className="card card-clickable">
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{item.title}</div>
+          items.map((item, idx) => (
+            <div key={item?.id || idx} className="card card-clickable">
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{item?.title || 'Untitled'}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
-                {item.category} · {item.source} · {item.created_at}
+                {item?.category || 'unknown'} · {item?.source || 'local'} · {item?.created_at || ''}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                {(item.content || '').substring(0, 200)}...
+                {toPreviewText(item?.content, 200)}...
               </div>
             </div>
           ))
