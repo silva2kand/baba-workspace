@@ -594,6 +594,79 @@ function isAllowedFsPath(targetPath) {
   return roots.some((root) => isPathWithin(root, targetPath));
 }
 
+function normalizeResearchQuery(query) {
+  return String(query || '').trim().replace(/\s+/g, ' ').slice(0, 240);
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function runWebResearch(query, maxResults = 5) {
+  const safeQuery = normalizeResearchQuery(query);
+  if (!safeQuery) return { query: '', results: [], fetchedAt: Date.now() };
+
+  const capped = Math.max(1, Math.min(Number(maxResults) || 5, 10));
+  const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(safeQuery)}&format=json&no_html=1&skip_disambig=1&no_redirect=1`;
+  const data = await fetchJsonWithTimeout(url, 8000);
+  const results = [];
+
+  if (data?.AbstractURL || data?.AbstractText) {
+    results.push({
+      title: String(data.Heading || safeQuery),
+      url: String(data.AbstractURL || ''),
+      snippet: String(data.AbstractText || '').slice(0, 420),
+      source: 'DuckDuckGo',
+    });
+  }
+
+  const related = Array.isArray(data?.RelatedTopics) ? data.RelatedTopics : [];
+  for (const item of related) {
+    if (results.length >= capped) break;
+    const text = String(item?.Text || '').trim();
+    const firstUrl = String(item?.FirstURL || '').trim();
+    if (text && firstUrl) {
+      results.push({
+        title: text.split(' - ')[0].slice(0, 120),
+        url: firstUrl,
+        snippet: text.slice(0, 420),
+        source: 'DuckDuckGo',
+      });
+      continue;
+    }
+
+    const nested = Array.isArray(item?.Topics) ? item.Topics : [];
+    for (const sub of nested) {
+      if (results.length >= capped) break;
+      const subText = String(sub?.Text || '').trim();
+      const subUrl = String(sub?.FirstURL || '').trim();
+      if (!subText || !subUrl) continue;
+      results.push({
+        title: subText.split(' - ')[0].slice(0, 120),
+        url: subUrl,
+        snippet: subText.slice(0, 420),
+        source: 'DuckDuckGo',
+      });
+    }
+  }
+
+  return {
+    query: safeQuery,
+    results: results.slice(0, capped),
+    fetchedAt: Date.now(),
+  };
+}
+
 function resolveDesktopShortcutTarget(mode = 'default') {
   const isDevMode = mode === 'dev';
 
@@ -997,6 +1070,20 @@ ipcMain.handle('system:open-path', async (event, targetPath) => {
     return errText === '';
   } catch {
     return false;
+  }
+});
+
+ipcMain.handle('research:web-search', async (event, query, options = {}) => {
+  try {
+    const maxResults = Number(options?.maxResults || 5);
+    return await runWebResearch(query, maxResults);
+  } catch (err) {
+    return {
+      query: normalizeResearchQuery(query),
+      results: [],
+      fetchedAt: Date.now(),
+      error: String(err),
+    };
   }
 });
 

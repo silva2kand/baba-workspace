@@ -4,6 +4,13 @@ import { chatWithModel } from '../../services/modelService';
 import { copyText, speakText } from '../../services/assistantActions';
 import type { ChatMessage } from '@shared/types';
 
+interface WebResearchHit {
+  title: string;
+  url: string;
+  snippet: string;
+  source: string;
+}
+
 export function ChatView() {
   const selectedProvider = useAppStore((s) => s.selectedProvider);
   const selectedModel = useAppStore((s) => s.selectedModel);
@@ -17,6 +24,8 @@ export function ChatView() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [chatMode, setChatMode] = useState<'chat' | 'face' | 'voice'>('chat');
   const [assignAgent, setAssignAgent] = useState<string | null>(null);
+  const [webResearchEnabled, setWebResearchEnabled] = useState(true);
+  const [webResearchSummary, setWebResearchSummary] = useState('');
   const [followUpByMessageId, setFollowUpByMessageId] = useState<Record<string, string[]>>({});
   const [followUpLoadingFor, setFollowUpLoadingFor] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -34,21 +43,29 @@ export function ChatView() {
   function parseFollowUpList(raw: string): string[] {
     const text = String(raw || '').trim();
     if (!text) return [];
+    const deFenced = text
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/```$/i, '')
+      .trim();
 
     try {
-      const parsed = JSON.parse(text);
+      const fixed = deFenced.startsWith('[') && !deFenced.endsWith(']') ? `${deFenced}]` : deFenced;
+      const parsed = JSON.parse(fixed);
       if (Array.isArray(parsed)) {
-        return parsed.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 3);
+        return parsed.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 5);
       }
     } catch {
       // ignore and continue with line parsing
     }
 
-    return text
+    const quoted = [...deFenced.matchAll(/"([^"\n]{4,200})"/g)].map((m) => m[1].trim()).filter(Boolean);
+    if (quoted.length > 0) return quoted.slice(0, 5);
+
+    return deFenced
       .split('\n')
-      .map((line) => line.replace(/^[-*•\d.)\s]+/, '').trim())
+      .map((line) => line.replace(/^[-*•\d.)\s]+/, '').replace(/^["'`]+|["'`,]+$/g, '').trim())
       .filter(Boolean)
-      .slice(0, 3);
+      .slice(0, 5);
   }
 
   function fallbackFollowUps(userInput: string, assistantText: string): string[] {
@@ -58,6 +75,8 @@ export function ChatView() {
         'Draft the final email I can send now.',
         'Give me a short follow-up checklist for this thread.',
         'Create a polite reminder if no reply in 48 hours.',
+        'Rewrite it in a stronger but still professional tone.',
+        'Prepare a WhatsApp version of this reply.',
       ];
     }
     if (joined.includes('case') || joined.includes('legal')) {
@@ -65,6 +84,8 @@ export function ChatView() {
         'Summarize next legal actions by priority.',
         'Draft a concise update I can send to my solicitor.',
         'List evidence/documents still missing for this case.',
+        'Highlight legal risks and urgency levels.',
+        'Turn this into a 7-day action plan.',
       ];
     }
     if (joined.includes('task') || joined.includes('plan')) {
@@ -72,21 +93,69 @@ export function ChatView() {
         'Break this into actionable tasks with deadlines.',
         'Which step should I do first right now?',
         'Prepare a short status update I can share.',
+        'What can be automated from this plan?',
+        'Assign each task to the best agent.',
       ];
     }
     return [
       'What should I do next?',
       'Can you turn this into a step-by-step checklist?',
       'Draft the message I should send now.',
+      'What risks should I watch for?',
+      'Give me a 24-hour execution plan.',
     ];
+  }
+
+  function shouldUseWebResearch(text: string): boolean {
+    const q = String(text || '').trim().toLowerCase();
+    if (!q || q.length < 6) return false;
+    if (/^(hi|hello|hey|yo|thanks|ok|okay)\b/.test(q)) return false;
+    return /(latest|today|current|news|update|web|research|online|market|price|law|policy|regulation|trend|who is|what is)/.test(q) || q.length > 30;
+  }
+
+  async function getWebResearchContext(userInput: string): Promise<{ context: string; hits: WebResearchHit[] }> {
+    if (!webResearchEnabled || !shouldUseWebResearch(userInput)) {
+      setWebResearchSummary('');
+      return { context: '', hits: [] };
+    }
+
+    try {
+      const payload = await window.babaAPI?.webSearch?.(userInput, { maxResults: 5 });
+      const hits = Array.isArray(payload?.results)
+        ? payload.results
+            .map((h: any) => ({
+              title: String(h?.title || '').trim(),
+              url: String(h?.url || '').trim(),
+              snippet: String(h?.snippet || '').trim(),
+              source: String(h?.source || 'Web').trim(),
+            }))
+            .filter((h: WebResearchHit) => h.title && h.url)
+            .slice(0, 5)
+        : [];
+
+      if (hits.length === 0) {
+        setWebResearchSummary('Web research: no external results found.');
+        return { context: '', hits: [] };
+      }
+
+      setWebResearchSummary(`Web research: ${hits.length} sources analyzed.`);
+      const context = [
+        'WEB RESEARCH CONTEXT (fresh external snippets, treat as supportive evidence):',
+        ...hits.map((h, idx) => `${idx + 1}. ${h.title}\nURL: ${h.url}\nSnippet: ${h.snippet}`),
+      ].join('\n');
+      return { context, hits };
+    } catch {
+      setWebResearchSummary('Web research unavailable for this request.');
+      return { context: '', hits: [] };
+    }
   }
 
   async function generateFollowUps(messageId: string, userInput: string, assistantText: string) {
     setFollowUpLoadingFor(messageId);
     try {
       const prompt = [
-        'Create exactly 3 short follow-up prompts the user can click next.',
-        'Return only a JSON array of 3 strings.',
+        'Create exactly 5 short follow-up prompts the user can click next.',
+        'Return only a JSON array of 5 strings.',
         `User message: ${userInput}`,
         `Assistant response: ${assistantText}`,
       ].join('\n');
@@ -134,12 +203,21 @@ export function ChatView() {
     setInput('');
     setIsStreaming(true);
 
+    const { context: webResearchContext, hits: webHits } = await getWebResearchContext(userInput);
+    const moeCore = [
+      'You are Baba, an advanced multi-expert (MoE) workspace intelligence.',
+      'Think and respond like coordinated specialists: Strategy, Technical, Finance, Legal, Risk, Operations, and Communications.',
+      'Always synthesize clearly for Silva with practical next actions.',
+      'When web research context exists, analyze it critically and cite source URLs inline.',
+      'Be concise, accurate, and execution-focused.',
+    ].join(' ');
     const systemPrompt = assignAgent
-      ? `You are the ${assignAgent} agent. Focus on tasks related to your specialty.`
-      : 'You are Baba, an intelligent workspace assistant. Be concise and helpful. You can multitask - agents are working in the background while you chat.';
+      ? `${moeCore} You are currently acting as the ${assignAgent} specialist agent for this turn.`
+      : moeCore;
 
     const apiMessages = [
       { role: 'system', content: systemPrompt },
+      ...(webResearchContext ? [{ role: 'system', content: webResearchContext }] : []),
       ...messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.content })),
       { role: 'user', content: userInput },
     ];
@@ -172,6 +250,24 @@ export function ChatView() {
           m.id === assistantId ? { ...m, status: 'done' } : m
         ));
       });
+
+      if (webHits.length > 0) {
+        const evidenceLine = webHits
+          .map((h) => `${h.title} (${h.url})`)
+          .slice(0, 3)
+          .join(' | ');
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `${assistantId}-web`,
+            role: 'system',
+            content: `🌐 Web research analyzed: ${evidenceLine}`,
+            timestamp: Date.now(),
+            status: 'done',
+          },
+        ]);
+      }
+
       void generateFollowUps(assistantId, userInput, String(finalText || streamed || '').trim());
     } catch {
       setMessages(prev => {
@@ -227,6 +323,13 @@ export function ChatView() {
           </span>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            className={`btn btn-sm ${webResearchEnabled ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setWebResearchEnabled((v) => !v)}
+            title="Toggle web research analysis"
+          >
+            🌐 Web {webResearchEnabled ? 'ON' : 'OFF'}
+          </button>
           {['chat', 'face', 'voice'].map(m => (
             <button
               key={m}
@@ -254,6 +357,11 @@ export function ChatView() {
           </button>
         ))}
       </div>
+      {webResearchSummary && (
+        <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+          {webResearchSummary}
+        </div>
+      )}
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>

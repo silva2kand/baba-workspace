@@ -17,6 +17,7 @@ interface Window {
     launchApp: (appId: string) => Promise<boolean>;
     openUrl: (url: string) => Promise<boolean>;
     openPath: (targetPath: string) => Promise<boolean>;
+    webSearch: (query: string, options?: { maxResults?: number }) => Promise<{ query: string; results: Array<{ title: string; url: string; snippet: string; source: string }>; fetchedAt: number; error?: string }>;
     createDesktopShortcut: () => Promise<{ ok: boolean; path?: string; paths?: string[]; target?: string; error?: string }>;
     storeLoad: () => Promise<any>;
     storeSave: (data: any) => Promise<boolean>;
