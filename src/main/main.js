@@ -622,6 +622,29 @@ function resolveDesktopShortcutTarget() {
   };
 }
 
+const MASTER_MEMORY_SEED_SOURCE = 'master-memory:seed:2026-04-13';
+const MASTER_MEMORY_UPDATE_SOURCE_PREFIX = 'master-memory:update:';
+
+async function ensureMasterMemoryIndexed() {
+  if (!brainIndex) return;
+  try {
+    const alreadyIndexed = await brainIndex.hasSource(MASTER_MEMORY_SEED_SOURCE);
+    if (alreadyIndexed) return;
+
+    const masterText = String(loadMasterMemory(true) || '').trim();
+    if (!masterText) return;
+
+    await brainIndex.ingest(
+      'BABA Master Memory Seed',
+      'memory',
+      masterText,
+      MASTER_MEMORY_SEED_SOURCE
+    );
+  } catch (err) {
+    console.error('Failed to index master memory seed:', err);
+  }
+}
+
 // ── Main window ─────────────────────────────────────────────────
 function createMainWindow(isDev) {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
@@ -740,6 +763,7 @@ app.whenReady().then(() => {
   initializeBrainPaths(app);
   initializeMasterMemory(app);
   brainIndex = new BrainIndex();
+  void ensureMasterMemoryIndexed();
 
   const isDev = !app.isPackaged && process.env.FORCE_PROD !== '1';
   createMainWindow(isDev);
@@ -996,7 +1020,24 @@ ipcMain.handle('memory:load', async () => {
 });
 
 ipcMain.handle('memory:append', async (event, text) => {
-  return appendMasterMemory(text);
+  const ok = appendMasterMemory(text);
+  if (!ok || !brainIndex) return ok;
+
+  try {
+    const payload = String(text || '').trim();
+    if (payload) {
+      await brainIndex.ingest(
+        'BABA Memory Update',
+        'memory',
+        payload,
+        `${MASTER_MEMORY_UPDATE_SOURCE_PREFIX}${Date.now()}`
+      );
+    }
+  } catch (err) {
+    console.error('Failed to index memory append:', err);
+  }
+
+  return ok;
 });
 
 // ── MiroFish Simulation IPC handlers ──────────────────────────────

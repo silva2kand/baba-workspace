@@ -97,6 +97,19 @@ export class BrainIndex {
     });
   }
 
+  hasSource(source) {
+    return new Promise((resolve, reject) => {
+      this.conn.get(
+        "SELECT COUNT(*) as count FROM items WHERE source = ?",
+        [String(source || '')],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve((row?.count || 0) > 0);
+        }
+      );
+    });
+  }
+
   close() {
     this.conn.close();
   }

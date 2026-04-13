@@ -22,9 +22,12 @@ export function BrainView() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadStats();
-    loadRecent();
+    void refreshAll();
   }, []);
+
+  async function refreshAll() {
+    await Promise.all([loadStats(), loadRecent()]);
+  }
 
   async function loadStats() {
     try {
@@ -65,7 +68,7 @@ export function BrainView() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700 }}>🧠 Brain Index</h2>
-        <button className="btn btn-secondary btn-sm" onClick={loadStats}>🔄 Refresh</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => { void refreshAll(); }}>🔄 Refresh</button>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
