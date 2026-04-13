@@ -89,6 +89,7 @@ export async function checkWhatsAppStatus(): Promise<{ connected: boolean; unrea
 }
 
 export async function createPopupWindow(options: {
+  id?: string;
   title: string;
   url?: string;
   width: number;
@@ -97,7 +98,9 @@ export async function createPopupWindow(options: {
   transparent?: boolean;
 }) {
   try {
-    const windowId = options.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 48) || 'popup';
+    const windowId = options.id
+      ? String(options.id)
+      : (options.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 48) || 'popup');
     await window.babaAPI?.openPopup?.(windowId, options);
     return true;
   } catch (err) {

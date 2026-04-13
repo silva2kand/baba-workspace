@@ -435,15 +435,6 @@ html, body, #root {
   color: var(--text-muted);
 }
 
-/* ── MoE Chat Line Rows ── */
-.chat-line-row:hover {
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-sm);
-}
-.chat-line-row:hover button {
-  opacity: 1 !important;
-}
-
 /* ── Loading Skeleton ── */
 .skeleton {
   background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-card) 50%, var(--bg-tertiary) 75%);

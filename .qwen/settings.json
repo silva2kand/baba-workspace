@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm run *)",
-      "Bash(npx *)"
+      "Bash(npx *)",
+      "Bash(git commit *)",
+      "Bash(findstr *)"
     ]
   },
   "$version": 3

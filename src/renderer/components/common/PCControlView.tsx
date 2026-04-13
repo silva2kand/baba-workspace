@@ -33,11 +33,11 @@ export const PCControlView: React.FC = () => {
   ];
 
   const controls = [
-    { name: 'Launch Terminal', icon: '🖥️', cmd: 'wt' },
+    { name: 'Launch Terminal', icon: '🖥️', cmd: 'terminal' },
     { name: 'File Explorer', icon: '📁', cmd: 'explorer' },
     { name: 'Task Manager', icon: '📈', cmd: 'taskmgr' },
     { name: 'Regedit', icon: '🛡️', cmd: 'regedit' },
-    { name: 'System Settings', icon: '⚙️', cmd: 'start ms-settings:' },
+    { name: 'System Settings', icon: '⚙️', cmd: 'settings' },
   ];
 
   const handleControl = (cmd: string) => {

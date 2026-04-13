@@ -5,6 +5,8 @@ import { scanAllProviders } from '../../services/modelService';
 export function AgentsView() {
   const agents = useAppStore((s) => s.agents);
   const updateAgentStatus = useAppStore((s) => s.updateAgentStatus);
+  const setCurrentView = useAppStore((s) => s.setCurrentView);
+  const setChatDraft = useAppStore((s) => s.setChatDraft);
   const selectedProvider = useAppStore((s) => s.selectedProvider);
   const selectedModel = useAppStore((s) => s.selectedModel);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
@@ -14,20 +16,35 @@ export function AgentsView() {
     brain: { capabilities: ['Reasoning', 'Orchestration', 'Task Assignment', 'Self-Correction', 'Multi-tasking'], model: 'Qwen3.5-9B-Claude-4.6-Opus' },
     coder: { capabilities: ['Code Generation', 'Document Drafting', 'Legal Responses', 'Template Creation'], model: 'Qwen2.5-Coder-14B' },
     research: { capabilities: ['Information Gathering', 'Signal Detection', 'Topic Monitoring', 'Web Research'], model: 'Qwen3.5-9B-Neo' },
-    money: { capabilities: ['Financial Analysis', 'HMRC Tracking', 'Deadline Management', 'Tax Calculations'], model: 'Qwen3.5-9B-Gemini-Pro' },
-    legal: { capabilities: ['Legal Correspondence', 'Case Management', 'Evidence Review', 'Risk Assessment'], model: 'Qwen3.5-9B-Claude-4.6-Opus' },
-    acct: { capabilities: ['Tax Analysis', 'Financial Reports', 'Budget Tracking', 'Compliance'], model: 'Meta-Llama-3.1-8B' },
-    supplier: { capabilities: ['Supplier Spend Analysis', 'Renegotiation Targets', 'Contract Review'], model: 'Qwen3.5-4B' },
-    deals: { capabilities: ['Auction Scanning', 'Premises Search', 'Liquidation Stock Scan'], model: 'Llama-3.1-8B' },
-    content: { capabilities: ['Content Generation', 'Social Media Drafting', 'Product Descriptions'], model: 'Qwen3.5-9B-Neo' },
-    comms: { capabilities: ['Email/WhatsApp Summary', 'Contact Mapping', 'Follow-up Drafting'], model: 'Llama-3.2-3B' },
-    pa: { capabilities: ['Renewal Tracking', 'Admin Summary', 'Document Management'], model: 'Llama-3.2-3B' },
+    money: { capabilities: ['Financial Analysis', 'HMRC Tracking', 'Deadline Management', 'Tax Calculations'], model: 'Qwen3.5-9B-Gemini-3.1-Pro' },
+    solicitor: { capabilities: ['Legal Correspondence', 'Case Management', 'Evidence Review', 'Risk Assessment'], model: 'Qwen3.5-9B-Claude-4.6-Opus-v2' },
+    accountant: { capabilities: ['Tax Analysis', 'Financial Reports', 'Budget Tracking', 'Compliance'], model: 'Meta-Llama-3.1-8B' },
+    legal: { capabilities: ['Contract Review', 'Dispute Drafting', 'Regulatory Triage', 'Case Escalation'], model: 'Qwen3.5-9B-Claude-4.6-Opus-v2' },
+    acct: { capabilities: ['Invoice Checks', 'VAT Tracking', 'Ledger Analysis', 'Cashflow Flags'], model: 'Meta-Llama-3.1-8B' },
+    supplier: { capabilities: ['Supplier Cost Analysis', 'Renewal Tracking', 'Negotiation Prep'], model: 'Qwen3.5-9B-Neo' },
+    deals: { capabilities: ['Property Deal Scanning', 'Opportunity Ranking', 'Risk Notes'], model: 'Qwen3.5-9B-Gemini-3.1-Pro' },
+    content: { capabilities: ['Drafting', 'Campaign Ideas', 'Post Generation'], model: 'Qwen2.5-Coder-14B' },
+    comms: { capabilities: ['WhatsApp Triage', 'Message Drafting', 'Conversation Summaries', 'Follow-up Actions'], model: 'Qwen3.5-9B-Claude-4.6-Opus' },
+    pa: { capabilities: ['Calendar/Deadline Tracking', 'Admin Workflows', 'Task Follow-ups'], model: 'Qwen3.5-9B-Neo' },
   };
 
   function assignTask(agentId: string) {
     if (!taskInput.trim()) return;
     updateAgentStatus(agentId, 'working', taskInput);
     setTaskInput('');
+  }
+
+  async function openWhatsApp() {
+    try {
+      await window.babaAPI?.launchApp?.('whatsapp');
+    } catch (err) {
+      console.error('Failed to launch WhatsApp:', err);
+    }
+  }
+
+  function draftWhatsAppReply(agentName: string) {
+    setChatDraft(`You are helping with WhatsApp communications via ${agentName}. Draft a clear, professional reply for the latest conversation and include a short follow-up checklist.`);
+    setCurrentView('chat');
   }
 
   return (
@@ -112,6 +129,12 @@ export function AgentsView() {
                     {agent.status === 'working' && <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); updateAgentStatus(agent.id, 'paused'); }}>⏸ Pause</button>}
                     {agent.status === 'paused' && <button className="btn btn-success btn-sm" onClick={(e) => { e.stopPropagation(); updateAgentStatus(agent.id, 'working', agent.currentTask); }}>▶ Resume</button>}
                   </div>
+                  {agent.id === 'comms' && (
+                    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); openWhatsApp(); }}>💬 Open WhatsApp</button>
+                      <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); draftWhatsAppReply(agent.name); }}>✍️ Draft Reply</button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

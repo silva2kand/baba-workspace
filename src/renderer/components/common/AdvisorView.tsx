@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { babaChat } from '../../services/modelRouterService';
+import { copyText, speakText } from '../../services/assistantActions';
 import type { ChatMessage } from '@shared/types';
 
 export const AdvisorView: React.FC = () => {
@@ -76,9 +77,49 @@ export const AdvisorView: React.FC = () => {
         {loading && !briefing ? (
           <div className="skeleton" style={{ height: 100, width: '100%', borderRadius: 8 }} />
         ) : (
-          <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
-            {briefing}
-            {loading && <span className="animate-pulse" style={{ color: 'var(--accent-blue)', marginLeft: 4 }}>▊</span>}
+          <div style={{ position: 'relative' }}>
+            <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', paddingRight: 32 }}>
+              {briefing}
+              {loading && <span className="animate-pulse" style={{ color: 'var(--accent-blue)', marginLeft: 4 }}>▊</span>}
+            </div>
+            {briefing && !loading && (
+              <div style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 4 }}>
+                <button
+                  onClick={() => copyText(briefing)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    opacity: 0.6,
+                    padding: '4px 6px',
+                    borderRadius: 4,
+                  }}
+                  title="Copy briefing"
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                >
+                  📋
+                </button>
+                <button
+                  onClick={() => speakText(briefing)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    opacity: 0.6,
+                    padding: '4px 6px',
+                    borderRadius: 4,
+                  }}
+                  title="Speak briefing"
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                >
+                  🔊
+                </button>
+              </div>
+            )}
           </div>
         )}
 

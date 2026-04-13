@@ -293,3 +293,16 @@ export type SidebarView =
   | 'kairos' | 'wiki' | 'claws' | 'self-evolving' | 'scheduler' | 'files'
   | 'pc-control' | 'browser' | 'local-apps' | 'models' | 'providers' | 'settings' | 'voice'
   | 'simulation';
+
+export type NotificationType = 'info' | 'success' | 'warning' | 'error';
+
+export interface NotificationCenterItem {
+  id: string;
+  title: string;
+  body: string;
+  icon?: string;
+  type: NotificationType;
+  timestamp: number;
+  read: boolean;
+  onClickTarget?: string | null;
+}

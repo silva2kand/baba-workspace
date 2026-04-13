@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import { useAppStore } from './stores/appStore';
+import { useKeyboardShortcuts } from './services/keyboardShortcuts';
+import { loadNotificationHistory, setupNotificationListeners } from './services/notificationService';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { Topbar } from './components/topbar/Topbar';
 import { Footer } from './components/footer/Footer';
@@ -21,6 +23,7 @@ import { AdvisorView } from './components/common/AdvisorView';
 import { ApprovalsView } from './components/common/ApprovalsView';
 import { TasksView } from './components/common/TasksView';
 import { ExoTriageView } from './components/common/ExoTriageView';
+import { OpenExoView } from './components/common/OpenExoView';
 import { KairosView } from './components/common/KairosView';
 import { WikiView } from './components/common/WikiView';
 import { ClawsView } from './components/common/ClawsView';
@@ -28,46 +31,16 @@ import { SelfEvolvingView } from './components/common/SelfEvolvingView';
 import { PCControlView } from './components/common/PCControlView';
 import { BrowserView } from './components/common/BrowserView';
 import { ModelsView } from './components/common/ModelsView';
-import { OpenExoView } from './components/common/OpenExoView';
 import { BrainView } from './components/common/BrainView';
 import { SimulationView } from './components/common/SimulationView';
 import { PopupManager } from './components/common/PopupManager';
-import { syncAndOrganize } from './services/emailService';
-
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  componentDidCatch(error: Error) {
-    console.error('Renderer crashed:', error);
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="card" style={{ padding: 14, borderColor: 'var(--accent-red)', maxWidth: 900, margin: '0 auto' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>⚠ Something went wrong</div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{this.state.error.message}</div>
-          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary btn-sm" onClick={() => window.location.reload()}>Reload</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => this.setState({ error: null })}>Dismiss</button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 const viewMap: Record<string, React.FC> = {
   home: HomeView,
   chat: ChatView,
   advisor: AdvisorView,
   agents: AgentsView,
-  brain: BrainView,
   inbox: InboxView,
   organizer: OrganizerView,
   cases: CasesView,
@@ -84,47 +57,52 @@ const viewMap: Record<string, React.FC> = {
   files: FilesView,
   'pc-control': PCControlView,
   browser: BrowserView,
+  brain: BrainView,
   'local-apps': LocalAppsView,
   models: ModelsView,
+  simulation: SimulationView,
   providers: ProvidersView,
   settings: SettingsView,
   voice: VoiceView,
-  simulation: SimulationView,
 };
 
 export default function App() {
   const currentView = useAppStore((s) => s.currentView);
   const contextPanelOpen = useAppStore((s) => s.contextPanelOpen);
-  const connections = useAppStore((s) => s.connections);
+  const hydrateStore = useAppStore((s) => s.hydrateStore);
 
-  const ViewComponent = viewMap[currentView] || HomeView;
+  // Mount global keyboard shortcuts
+  useKeyboardShortcuts();
 
+  // Set up notification listeners on app mount
   useEffect(() => {
-    async function init() {
-      try {
-        if (window.babaAPI) {
-          const storeData = await window.babaAPI.storeLoad();
-          useAppStore.getState().hydrateStore(storeData);
-        }
-      } catch (err) {
-        console.error('Store init failed:', err);
-      }
-    }
-    init();
+    const cleanup = setupNotificationListeners();
+    loadNotificationHistory().catch((err) => {
+      console.error('Failed to load notification history:', err);
+    });
+    return cleanup;
   }, []);
 
+  // Load persisted store data once on startup
   useEffect(() => {
-    const hasEmail = connections.some((c) => c.type === 'email' && c.status === 'connected');
-    if (!hasEmail) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await window.babaAPI?.storeLoad?.();
+        if (!cancelled && data) {
+          hydrateStore(data);
+        }
+      } catch (err) {
+        console.error('Failed to hydrate app store:', err);
+      }
+    })();
 
-    syncAndOrganize({ maxResults: 50 }).catch(console.error);
-    const interval = setInterval(() => {
-      const stillHasEmail = useAppStore.getState().connections.some((c) => c.type === 'email' && c.status === 'connected');
-      if (stillHasEmail) syncAndOrganize({ maxResults: 50 }).catch(console.error);
-    }, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrateStore]);
 
-    return () => clearInterval(interval);
-  }, [connections]);
+  const ViewComponent = viewMap[currentView] || HomeView;
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg-primary)' }}>
@@ -138,7 +116,7 @@ export default function App() {
 
         {/* Main Workspace */}
         <main className="flex-1 overflow-y-auto" style={{ padding: '16px 20px' }}>
-          <ErrorBoundary>
+          <ErrorBoundary name={currentView}>
             <ViewComponent />
           </ErrorBoundary>
         </main>

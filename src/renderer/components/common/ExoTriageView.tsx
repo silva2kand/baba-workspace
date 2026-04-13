@@ -21,6 +21,7 @@ export const ExoTriageView: React.FC = () => {
     { id: '2', source: 'outlook', title: 'Property Completion Date', sender: 'Thompson & Co', timestamp: '09:45', snippet: 'We are pleased to confirm...', suggestedCategory: 'Legal', status: 'pending' },
     { id: '3', source: 'radar', title: 'New tax band thresholds for Q3', sender: 'gov.uk', timestamp: '10:15', snippet: 'The newly proposed thresholds...', suggestedCategory: 'HMRC', status: 'pending' },
     { id: '4', source: 'gmail', title: 'Unusual Activity Alert', sender: 'Santander', timestamp: '09:12', snippet: 'We detected unusual activity...', suggestedCategory: 'Banking', status: 'pending' },
+    { id: '5', source: 'whatsapp', title: 'Client asks for contract update', sender: 'WhatsApp: M. Thompson', timestamp: '11:08', snippet: 'Can you send me the latest draft today?', suggestedCategory: 'Legal', status: 'pending' },
   ]);
 
   const handleRoute = (id: string, view: string) => {

@@ -1,21 +1,19 @@
 import React from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { syncAndOrganize } from '../../services/emailService';
 
 export function OrganizerView() {
   const emailScanProgress = useAppStore((s) => s.emailScanProgress);
   const organizedEmails = useAppStore((s) => s.organizedEmails);
-  const setEmailScanProgress = useAppStore((s) => s.setEmailScanProgress);
 
   const categories = [
-    { name: 'Urgent', count: organizedEmails.filter(e => e.category === 'Urgent').length, color: '#ef4444', icon: '🔴' },
-    { name: 'Legal', count: organizedEmails.filter(e => e.category === 'Legal').length, color: '#818cf8', icon: '⚖️' },
-    { name: 'Banking', count: organizedEmails.filter(e => e.category === 'Banking').length, color: '#f59e0b', icon: '🏦' },
-    { name: 'Supplier', count: organizedEmails.filter(e => e.category === 'Supplier').length, color: '#06b6d4', icon: '📦' },
-    { name: 'Council', count: organizedEmails.filter(e => e.category === 'Council').length, color: '#10b981', icon: '🏛️' },
-    { name: 'HMRC', count: organizedEmails.filter(e => e.category === 'HMRC').length, color: '#a855f7', icon: '💰' },
-    { name: 'Property', count: organizedEmails.filter(e => e.category === 'Property').length, color: '#ec4899', icon: '🏠' },
-    { name: 'Scams', count: organizedEmails.filter(e => e.category === 'Scams').length, color: '#6b7280', icon: '🚫' },
+    { name: 'Urgent', count: 42, color: '#ef4444', icon: '🔴' },
+    { name: 'Legal', count: 12, color: '#818cf8', icon: '⚖️' },
+    { name: 'Banking', count: 8, color: '#f59e0b', icon: '🏦' },
+    { name: 'Supplier', count: 15, color: '#06b6d4', icon: '📦' },
+    { name: 'Council', count: 6, color: '#10b981', icon: '🏛️' },
+    { name: 'HMRC', count: 3, color: '#a855f7', icon: '💰' },
+    { name: 'Property', count: 5, color: '#ec4899', icon: '🏠' },
+    { name: 'Scams', count: 2, color: '#6b7280', icon: '🚫' },
   ];
 
   return (
@@ -23,30 +21,8 @@ export function OrganizerView() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700 }}>Email Organizer</h2>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            className="btn btn-primary btn-sm"
-            disabled={emailScanProgress.status === 'RUNNING'}
-            onClick={async () => {
-              try {
-                await syncAndOrganize({ maxResults: 100 });
-              } catch (err: any) {
-                setEmailScanProgress({
-                  ...emailScanProgress,
-                  status: 'ERROR',
-                  error: err?.message ? String(err.message) : String(err),
-                });
-                console.error(err);
-              }
-            }}
-          >
-            ▶ Start Organizing
-          </button>
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => setEmailScanProgress({ ...emailScanProgress, status: 'PAUSED' })}
-          >
-            ⏸ Pause
-          </button>
+          <button className="btn btn-primary btn-sm">▶ Start Organizing</button>
+          <button className="btn btn-secondary btn-sm">⏸ Pause</button>
           <button className="btn btn-ghost btn-sm">⚙ Settings</button>
         </div>
       </div>
@@ -59,11 +35,6 @@ export function OrganizerView() {
             {emailScanProgress.status} • Run #{emailScanProgress.runNumber}
           </span>
         </div>
-        {emailScanProgress.status === 'ERROR' && emailScanProgress.error && (
-          <div style={{ fontSize: 11, color: 'var(--accent-red)', marginBottom: 8 }}>
-            ⚠ {emailScanProgress.error}
-          </div>
-        )}
         <div className="progress-bar" style={{ marginBottom: 8 }}>
           <div className="progress-bar-fill" style={{ width: `${emailScanProgress.progress}%` }} />
         </div>

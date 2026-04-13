@@ -2,52 +2,44 @@ import React from 'react';
 import { useAppStore } from '../../stores/appStore';
 
 const navItems = [
-  {
-    section: 'CORE', items: [
-      { id: 'home' as const, label: 'Home', icon: '🏠' },
-      { id: 'chat' as const, label: 'Chat', icon: '💬' },
-      { id: 'advisor' as const, label: 'Advisor', icon: '🧭' },
-      { id: 'agents' as const, label: 'Agents', icon: '🤖', badge: 4 },
-    ]
-  },
-  {
-    section: 'INTELLIGENCE', items: [
-      { id: 'inbox' as const, label: 'Inbox', icon: '📥', badge: 86 },
-      { id: 'brain' as const, label: 'Brain Index', icon: '🧠' },
-      { id: 'organizer' as const, label: 'Organizer', icon: '🗂️' },
-      { id: 'cases' as const, label: 'Cases', icon: '📋', badge: 80 },
-      { id: 'radar' as const, label: 'Radar', icon: '📡', badge: 5 },
-      { id: 'approvals' as const, label: 'Approvals', icon: '✅' },
-      { id: 'tasks' as const, label: 'Tasks', icon: '📝' },
-    ]
-  },
-  {
-    section: 'OPERATIONS', items: [
-      { id: 'exo-triage' as const, label: 'Exo Triage', icon: '⚡' },
-      { id: 'open-exo' as const, label: 'Open Exo', icon: '🔓' },
-      { id: 'kairos' as const, label: 'Kairos', icon: '⏳' },
-      { id: 'wiki' as const, label: 'Wiki', icon: '📚' },
-      { id: 'claws' as const, label: 'Claws', icon: '🦅' },
-      { id: 'self-evolving' as const, label: 'Self-Evolving', icon: '🧬' },
-      { id: 'simulation' as const, label: 'Simulations', icon: '🐟' },
-    ]
-  },
-  {
-    section: 'SYSTEM', items: [
-      { id: 'scheduler' as const, label: 'Scheduler', icon: '⏰' },
-      { id: 'files' as const, label: 'Files', icon: '📁' },
-      { id: 'pc-control' as const, label: 'PC Control', icon: '🖥️' },
-      { id: 'browser' as const, label: 'Browser', icon: '🌐' },
-      { id: 'local-apps' as const, label: 'Local Apps', icon: '📱' },
-      { id: 'models' as const, label: 'Models', icon: '🧠' },
-      { id: 'providers' as const, label: 'Providers', icon: '🔌' },
-      { id: 'settings' as const, label: 'Settings', icon: '⚙️' },
-    ]
-  },
+  { section: 'CORE', items: [
+    { id: 'home' as const, label: 'Home', icon: '🏠', badge: undefined as number | undefined },
+    { id: 'chat' as const, label: 'Chat', icon: '💬', badge: undefined as number | undefined },
+    { id: 'advisor' as const, label: 'Advisor', icon: '🧭', badge: undefined as number | undefined },
+    { id: 'agents' as const, label: 'Agents', icon: '🤖', badge: 4 },
+  ]},
+  { section: 'INTELLIGENCE', items: [
+    { id: 'inbox' as const, label: 'Inbox', icon: '📥', badge: 86 },
+    { id: 'organizer' as const, label: 'Organizer', icon: '🗂️', badge: undefined as number | undefined },
+    { id: 'brain' as const, label: 'Brain', icon: '🧠', badge: undefined as number | undefined },
+    { id: 'cases' as const, label: 'Cases', icon: '📋', badge: 80 },
+    { id: 'radar' as const, label: 'Radar', icon: '📡', badge: 5 },
+    { id: 'approvals' as const, label: 'Approvals', icon: '✅', badge: undefined as number | undefined },
+    { id: 'tasks' as const, label: 'Tasks', icon: '📝', badge: undefined as number | undefined },
+  ]},
+  { section: 'OPERATIONS', items: [
+    { id: 'exo-triage' as const, label: 'Exo Triage', icon: '⚡', badge: undefined as number | undefined },
+    { id: 'open-exo' as const, label: 'Open Exo', icon: '🔓', badge: undefined as number | undefined },
+    { id: 'kairos' as const, label: 'Kairos', icon: '⏳', badge: undefined as number | undefined },
+    { id: 'wiki' as const, label: 'Wiki', icon: '📚', badge: undefined as number | undefined },
+    { id: 'claws' as const, label: 'Claws', icon: '🦅', badge: undefined as number | undefined },
+    { id: 'simulation' as const, label: 'Simulation', icon: '🧪', badge: undefined as number | undefined },
+    { id: 'self-evolving' as const, label: 'Self-Evolving', icon: '🧬', badge: undefined as number | undefined },
+  ]},
+  { section: 'SYSTEM', items: [
+    { id: 'scheduler' as const, label: 'Scheduler', icon: '⏰', badge: undefined as number | undefined },
+    { id: 'files' as const, label: 'Files', icon: '📁', badge: undefined as number | undefined },
+    { id: 'pc-control' as const, label: 'PC Control', icon: '🖥️', badge: undefined as number | undefined },
+    { id: 'browser' as const, label: 'Browser', icon: '🌐', badge: undefined as number | undefined },
+    { id: 'local-apps' as const, label: 'Local Apps', icon: '📱', badge: undefined as number | undefined },
+    { id: 'models' as const, label: 'Models', icon: '🧠', badge: undefined as number | undefined },
+    { id: 'providers' as const, label: 'Providers', icon: '🔌', badge: undefined as number | undefined },
+    { id: 'voice' as const, label: 'Voice', icon: '🎤', badge: undefined as number | undefined },
+    { id: 'settings' as const, label: 'Settings', icon: '⚙️', badge: undefined as number | undefined },
+  ]},
 ];
 
 export function Sidebar() {
-  // force HMR
   const currentView = useAppStore((s) => s.currentView);
   const setCurrentView = useAppStore((s) => s.setCurrentView);
   const agents = useAppStore((s) => s.agents);
@@ -80,7 +72,11 @@ export function Sidebar() {
             <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>v0.9.2 beta</div>
           </div>
         </div>
-        <button className="btn btn-primary w-full" style={{ fontSize: 12 }}>
+        <button
+          className="btn btn-primary w-full"
+          style={{ fontSize: 12 }}
+          onClick={() => setCurrentView('tasks')}
+        >
           ✨ New Task
         </button>
       </div>
@@ -141,7 +137,7 @@ export function Sidebar() {
                 >
                   <span style={{ fontSize: 14 }}>{item.icon}</span>
                   <span style={{ flex: 1 }}>{item.label}</span>
-                  {'badge' in item && item.badge && (
+                  {item.badge && (
                     <span className="badge" style={{
                       background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--accent-blue)',
                       fontSize: 10,

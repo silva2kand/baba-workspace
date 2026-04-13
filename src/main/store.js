@@ -14,6 +14,7 @@ export function initializeStorePaths(app) {
 }
 
 const DEFAULT_STATE = {
+  // Existing
   wikiEntries: [
     {
       id: "seed-hmrc-1",
@@ -72,6 +73,44 @@ const DEFAULT_STATE = {
       outlookTenant: 'common',
       gmailClientId: '',
     }
+  },
+
+  // NEW: Persistent task storage
+  tasks: [],
+
+  // NEW: Persistent email cache
+  emails: [],
+
+  // NEW: Scheduler history
+  schedulerHistory: [],
+
+  // NEW: Chat threads
+  chatThreads: [],
+
+  // NEW: Radar alerts
+  radarAlerts: [],
+
+  // NEW: Approved actions
+  approvals: [],
+
+  // NEW: System evolution log
+  evolutionLog: [],
+
+  // NEW: User preferences
+  preferences: {
+    theme: 'warm-light',
+    density: 'comfortable',
+    motion: 'balanced',
+    defaultAgent: 'brain',
+    autoSaveEnabled: true,
+  },
+
+  // NEW: Metadata
+  metadata: {
+    version: '0.9.2',
+    lastBackup: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   }
 };
 
@@ -94,10 +133,53 @@ export function loadStore(app) {
 export function saveStore(data, app) {
   if (!STORE_DIR && app) initializeStorePaths(app);
   try {
+    // Update metadata timestamp
+    if (data.metadata) {
+      data.metadata.updatedAt = new Date().toISOString();
+    }
+    
     fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2));
     return true;
   } catch (err) {
     console.error('Failed to save store:', err);
     return false;
   }
+}
+
+// Helper: Update specific store field without loading/saving entire store
+export function updateStoreField(fieldName, fieldValue, app) {
+  if (!STORE_DIR) initializeStorePaths(app);
+  const store = loadStore(app);
+  store[fieldName] = fieldValue;
+  return saveStore(store, app);
+}
+
+// Helper: Get specific store field
+export function getStoreField(fieldName, app) {
+  if (!STORE_DIR) initializeStorePaths(app);
+  const store = loadStore(app);
+  return store[fieldName];
+}
+
+// Helper: Backup store to a timestamped file
+export function backupStore(app) {
+  if (!STORE_DIR) initializeStorePaths(app);
+  const store = loadStore(app);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupPath = path.join(STORE_DIR, `baba_store_backup_${timestamp}.json`);
+  
+  try {
+    fs.writeFileSync(backupPath, JSON.stringify(store, null, 2));
+    store.metadata.lastBackup = new Date().toISOString();
+    saveStore(store, app);
+    return { success: true, path: backupPath };
+  } catch (err) {
+    console.error('Failed to backup store:', err);
+    return { success: false, error: String(err) };
+  }
+}
+
+// Expose store directory for IPC handlers
+export function getStoreDirectory() {
+  return STORE_DIR;
 }

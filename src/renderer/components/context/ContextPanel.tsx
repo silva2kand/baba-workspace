@@ -37,55 +37,12 @@ export function ContextPanel() {
         {/* Orchestration */}
         <div style={{ marginBottom: 16 }}>
           <div className="section-header">ORCHESTRATION</div>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', fontSize: 12, marginBottom: 8 }}>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', fontSize: 12 }}>
             <div style={{ color: 'var(--text-secondary)' }}>Baba supervising <strong style={{ color: 'var(--accent-green)' }}>{workingAgents.length} agents</strong>.</div>
             <div style={{ color: 'var(--text-muted)', marginTop: 4, fontSize: 11 }}>
               {workingAgents.length > 0 ? `${workingAgents.length} tasks completing...` : 'All agents idle.'}
             </div>
-            <div style={{ color: 'var(--accent-green)', marginTop: 4, fontSize: 11 }}>✓ Ready for action.</div>
-          </div>
-          
-          {/* Active Agent Panels */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {agents.map(agent => {
-              const activeTask = useAppStore.getState().tasks.find(t => t.agentId === agent.id && t.status === 'running');
-              const isWorking = agent.status === 'working';
-              
-              return (
-                <div key={agent.id} style={{ 
-                  background: isWorking ? 'rgba(34, 197, 94, 0.05)' : 'var(--bg-card)', 
-                  border: isWorking ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid transparent',
-                  borderRadius: 'var(--radius-md)', 
-                  padding: '8px 10px',
-                  transition: 'all 0.3s ease'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>{agent.icon}</span> 
-                      <span>{agent.name}</span>
-                    </div>
-                    {isWorking ? (
-                      <span className="badge badge-urgent" style={{ background: 'var(--accent-green)', padding: '2px 6px', fontSize: 9 }}>ACTIVE</span>
-                    ) : (
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Idle</span>
-                    )}
-                  </div>
-                  
-                  {isWorking && activeTask && (
-                    <div style={{ marginTop: 8, padding: '8px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)' }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6 }}>{activeTask.title}</div>
-                      <div className="progress-bar" style={{ height: 4 }}>
-                        <div className="progress-bar-fill" style={{ width: `${activeTask.progress || 0}%`, background: 'var(--accent-green)' }} />
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: 'var(--text-muted)' }}>
-                        <span>Working...</span>
-                        <span>{activeTask.progress || 0}%</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            <div style={{ color: 'var(--accent-green)', marginTop: 4, fontSize: 11 }}>✓ Self-evolution passed.</div>
           </div>
         </div>
 
@@ -101,7 +58,7 @@ export function ContextPanel() {
 
         {/* Self Correction */}
         <div style={{ marginBottom: 16 }}>
-          <div className="section-header">SYSTEM LOG</div>
+          <div className="section-header">SELF CORRECTION</div>
           {[
             { time: '10:20', msg: 'Adjusted prompt for Coder' },
             { time: '10:18', msg: 'Rerouted to Opus-Distill' },
@@ -124,6 +81,21 @@ export function ContextPanel() {
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
               <span>{conn.name}:</span>
               <span style={{ color: conn.color }}>{conn.value}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Provider Status */}
+        <div style={{ marginBottom: 16 }}>
+          <div className="section-header">PROVIDERS</div>
+          {[
+            { name: 'Outlook', status: 'oauth connected', color: 'var(--accent-green)' },
+            { name: 'Gmail', status: 'agent off', color: 'var(--text-muted)' },
+            { name: 'WhatsApp', status: 'synced', color: 'var(--accent-green)' },
+          ].map((p, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 11 }}>
+              <span>{p.name}:</span>
+              <span style={{ color: p.color }}>{p.status}</span>
             </div>
           ))}
         </div>

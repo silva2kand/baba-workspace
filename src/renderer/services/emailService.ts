@@ -1,5 +1,6 @@
 import type { EmailMessage, OrganizedEmail, EmailScanProgress } from '@shared/types';
 import { useAppStore } from '../stores/appStore';
+import { notify } from './notificationService';
 
 const categoryColor: Record<string, string> = {
   Urgent: '#ef4444',
@@ -193,6 +194,10 @@ export async function syncAndOrganize(options?: { maxResults?: number }) {
       progress: 100,
       error: errors.slice(0, 3).join(' • '),
     });
+    // Send notification for email sync error
+    notify.error('Email Sync Failed', `Failed to sync emails: ${errors.slice(0, 2).join(', ')}`, {
+      onClickTarget: 'inbox',
+    });
     return;
   }
 
@@ -212,6 +217,14 @@ export async function syncAndOrganize(options?: { maxResults?: number }) {
     progress: 100,
     error: errors.length ? errors.slice(0, 3).join(' • ') : '',
   });
+
+  // Send notification for completed email scan
+  if (categorized.length > 0) {
+    const urgentMsg = urgent > 0 ? ` ${urgent} urgent email(s) detected.` : '';
+    notify.success('Email Scan Complete', `Found ${categorized.length} emails.${urgentMsg}`, {
+      onClickTarget: 'inbox',
+    });
+  }
   })().finally(() => {
     running = null;
   });

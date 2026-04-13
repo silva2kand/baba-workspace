@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { LocalModel, Provider, Agent, SelfEvolutionEntry, SystemStatus, EmailScanProgress, OrganizedEmail, EmailMessage, ChatThread, SidebarView, ConnectionData, Task, ApprovalItem, WikiEntry, AppSettings, MiroFishConfig, SimulationJob, SimulationReport } from '@shared/types';
+import type { LocalModel, Provider, Agent, SelfEvolutionEntry, SystemStatus, EmailScanProgress, OrganizedEmail, EmailMessage, ChatThread, SidebarView, ConnectionData, Task, ApprovalItem, WikiEntry, AppSettings, MiroFishConfig, SimulationJob, SimulationReport, NotificationCenterItem } from '@shared/types';
 
 interface AppState {
   currentView: SidebarView;
@@ -32,6 +32,8 @@ interface AppState {
   currentChatId: string | null;
   setCurrentChatId: (id: string | null) => void;
   addChat: (chat: ChatThread) => void;
+  chatDraft: string;
+  setChatDraft: (value: string) => void;
 
   evolutionLog: SelfEvolutionEntry[];
   addEvolutionEntry: (entry: SelfEvolutionEntry) => void;
@@ -90,7 +92,22 @@ interface AppState {
   setSimulationReports: (v: SimulationReport[]) => void;
   addSimulationReport: (v: SimulationReport) => void;
 
+  notifications: NotificationCenterItem[];
+  setNotifications: (v: NotificationCenterItem[]) => void;
+  addNotification: (v: NotificationCenterItem) => void;
+  markNotificationsRead: (ids: string[]) => void;
+  markAllNotificationsRead: () => void;
+  clearNotifications: () => void;
+  unreadNotificationCount: number;
+  notificationPanelOpen: boolean;
+  setNotificationPanelOpen: (v: boolean) => void;
+
   hydrateStore: (data: any) => void;
+  
+  // NEW: Persistence helpers
+  persistField: (fieldName: string, value: any) => Promise<void>;
+  loadField: (fieldName: string) => Promise<any>;
+  backupStore: () => Promise<{ success: boolean; path?: string; error?: string }>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -135,12 +152,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
 
   tasks: [],
-  setTasks: (tasks) => set({ tasks }),
+  setTasks: (tasks) => {
+    set({ tasks });
+    // Auto-persist tasks to disk
+    get().persistField('tasks', tasks);
+  },
 
   activeChats: [],
   currentChatId: null,
   setCurrentChatId: (id) => set({ currentChatId: id }),
   addChat: (chat) => set((state) => ({ activeChats: [...state.activeChats, chat] })),
+  chatDraft: '',
+  setChatDraft: (value) => set({ chatDraft: value }),
 
   evolutionLog: [],
   addEvolutionEntry: (entry) => set((state) => ({ evolutionLog: [entry, ...state.evolutionLog].slice(0, 100) })),
@@ -173,7 +196,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setEmailScanProgress: (progress) => set({ emailScanProgress: progress }),
 
   emails: [],
-  setEmails: (emails) => set({ emails }),
+  setEmails: (emails) => {
+    set({ emails });
+    // Auto-persist emails to disk
+    get().persistField('emails', emails);
+  },
 
   organizedEmails: [],
   setOrganizedEmails: (emails) => set({ organizedEmails: emails }),
@@ -188,7 +215,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   ],
   setConnections: (connections) => {
     set({ connections });
-    window.babaAPI?.storeSave({ wikiEntries: get().wikiEntries, connections, settings: get().settings, cases: [] });
+    get().persistField('connections', connections);
   },
 
   settings: {
@@ -200,7 +227,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setSettings: (settings) => {
     set({ settings });
-    window.babaAPI?.storeSave({ wikiEntries: get().wikiEntries, connections: get().connections, settings, cases: [] });
+    get().persistField('settings', settings);
   },
 
   contextPanelOpen: true,
@@ -222,10 +249,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     { id: '1', type: 'email', title: 'Draft reply to Thompson & Co', description: 'Confirming the completion date as Feb 12th.', preparedBy: 'Solicitor Agent', timestamp: '10:45', status: 'pending', data: {} },
     { id: '2', type: 'action', title: 'File VAT Return', description: 'Agent prepared the HMRC submission for Q4.', preparedBy: 'Accountant Agent', timestamp: 'Yesterday', status: 'pending', data: {} },
   ],
-  setApprovals: (v) => set({ approvals: v }),
+  setApprovals: (v) => {
+    set({ approvals: v });
+    // Auto-persist approvals to disk
+    get().persistField('approvals', v);
+  },
 
   wikiEntries: [],
-  setWikiEntries: (v) => { set({ wikiEntries: v }); window.babaAPI?.storeSave({ wikiEntries: v, connections: get().connections, settings: get().settings, cases: [] }); },
+  setWikiEntries: (v) => {
+    set({ wikiEntries: v });
+    get().persistField('wikiEntries', v);
+  },
 
   miroFishConfig: {
     baseUrl: 'http://localhost:8000',
@@ -248,6 +282,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   simulationReports: [],
   setSimulationReports: (v) => set({ simulationReports: v }),
   addSimulationReport: (v) => set((state) => ({ simulationReports: [...state.simulationReports, v] })),
+
+  notifications: [],
+  setNotifications: (v) => set({ notifications: v, unreadNotificationCount: v.filter((n) => !n.read).length }),
+  addNotification: (v) => set((state) => {
+    const next = [v, ...state.notifications].slice(0, 200);
+    return { notifications: next, unreadNotificationCount: next.filter((n) => !n.read).length };
+  }),
+  markNotificationsRead: (ids) => set((state) => {
+    const next = state.notifications.map((n) => ids.includes(n.id) ? { ...n, read: true } : n);
+    return { notifications: next, unreadNotificationCount: next.filter((n) => !n.read).length };
+  }),
+  markAllNotificationsRead: () => set((state) => ({
+    notifications: state.notifications.map((n) => ({ ...n, read: true })),
+    unreadNotificationCount: 0,
+  })),
+  clearNotifications: () => set({ notifications: [], unreadNotificationCount: 0 }),
+  unreadNotificationCount: 0,
+  notificationPanelOpen: false,
+  setNotificationPanelOpen: (v) => set({ notificationPanelOpen: v }),
 
   hydrateStore: (data) => {
     const rawConnections = Array.isArray(data?.connections) ? data.connections : [];
@@ -275,6 +328,40 @@ export const useAppStore = create<AppState>((set, get) => ({
       wikiEntries: Array.isArray(data?.wikiEntries) ? data.wikiEntries : [],
       connections: normalized,
       settings,
+      // Load new persistent fields
+      tasks: Array.isArray(data?.tasks) ? data.tasks : [],
+      emails: Array.isArray(data?.emails) ? data.emails : [],
+      approvals: Array.isArray(data?.approvals) ? data.approvals : [],
     });
+  },
+
+  // NEW: Persist specific field to disk
+  persistField: async (fieldName: string, value: any) => {
+    try {
+      await window.babaAPI?.storeFieldSet?.(fieldName, value);
+    } catch (err) {
+      console.error(`Failed to persist field: ${fieldName}`, err);
+    }
+  },
+
+  // NEW: Load specific field from disk
+  loadField: async (fieldName: string) => {
+    try {
+      return await window.babaAPI?.storeFieldGet?.(fieldName);
+    } catch (err) {
+      console.error(`Failed to load field: ${fieldName}`, err);
+      return null;
+    }
+  },
+
+  // NEW: Backup entire store
+  backupStore: async () => {
+    try {
+      const result = await window.babaAPI?.storeBackup?.();
+      return result;
+    } catch (err) {
+      console.error('Failed to backup store:', err);
+      return { success: false, error: String(err) };
+    }
   },
 }));

@@ -102,7 +102,7 @@ export function HomeView() {
 
       {/* Quick Actions */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" onClick={() => setCurrentView('advisor')}>🧭 Open Daily Briefing</button>
+        <button className="btn btn-secondary" onClick={() => setCurrentView('inbox')}>📥 Open quick panel</button>
         <button className="btn btn-secondary" onClick={() => setCurrentView('cases')}>📋 Start focused work</button>
         <button className="btn btn-secondary" onClick={() => setCurrentView('radar')}>📡 Check radar signals</button>
         <button className="btn btn-secondary" onClick={() => setCurrentView('chat')}>💬 Voice mode</button>

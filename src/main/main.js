@@ -11,7 +11,14 @@ const shell = electron.default.shell;
 const safeStorage = electron.default.safeStorage;
 
 // Initialize store paths immediately once app is available
-import { initializeStorePaths } from './store.js';
+import {
+  initializeStorePaths,
+  loadStore,
+  saveStore,
+  getStoreField,
+  updateStoreField,
+  backupStore,
+} from './store.js';
 import { initializeBrainPaths, BrainIndex, initializeMasterMemory, loadMasterMemory, appendMasterMemory, injectMasterMemory } from './brain.js';
 import os from 'node:os';
 import fs from 'node:fs';
@@ -31,6 +38,16 @@ let mainWindow = null;
 let tray = null;
 let popupWindows = {};
 let isQuitting = false;  // ← tracks real quit intent
+
+function setStoreField(fieldName, fieldValue) {
+  // Defensive fallback in case a stale runtime build is missing the helper import.
+  if (typeof updateStoreField === 'function') {
+    return updateStoreField(fieldName, fieldValue, app);
+  }
+  const store = loadStore(app);
+  store[fieldName] = fieldValue;
+  return saveStore(store, app);
+}
 
 function getSecretsPath() {
   return path.join(app.getPath('userData'), 'baba_secrets.json');
@@ -508,6 +525,75 @@ function attachWindowDebug(win, label) {
   });
 }
 
+const LAUNCHABLE_APPS = Object.freeze({
+  outlook: 'outlook.exe',
+  whatsapp: 'WhatsApp.exe',
+  chrome: 'chrome.exe',
+  edge: 'msedge.exe',
+  excel: 'excel.exe',
+  word: 'winword.exe',
+  explorer: 'explorer.exe',
+  notepad: 'notepad.exe',
+  calculator: 'calc.exe',
+  terminal: 'wt.exe',
+  wt: 'wt.exe',
+  powershell: 'powershell.exe',
+  taskmgr: 'taskmgr.exe',
+  taskmanager: 'taskmgr.exe',
+  regedit: 'regedit.exe',
+  teams: 'teams.exe',
+});
+
+const SAFE_EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
+
+function isSafeExternalUrl(raw) {
+  try {
+    const parsed = new URL(String(raw || ''));
+    return SAFE_EXTERNAL_PROTOCOLS.has(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function normalizePathForCompare(p) {
+  const resolved = path.resolve(p);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+function isPathWithin(rootPath, targetPath) {
+  const root = normalizePathForCompare(rootPath);
+  const target = normalizePathForCompare(targetPath);
+  const rel = path.relative(root, target);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+function getAllowedFsRoots() {
+  return [
+    app.getPath('home'),
+    app.getPath('desktop'),
+    app.getPath('documents'),
+    app.getPath('downloads'),
+    app.getPath('userData'),
+    process.cwd(),
+  ].filter(Boolean);
+}
+
+function sanitizeFsPath(rawPath) {
+  if (typeof rawPath !== 'string') return null;
+  const trimmed = rawPath.trim();
+  if (!trimmed) return null;
+  try {
+    return path.resolve(trimmed);
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedFsPath(targetPath) {
+  const roots = getAllowedFsRoots();
+  return roots.some((root) => isPathWithin(root, targetPath));
+}
+
 // ── Main window ─────────────────────────────────────────────────
 function createMainWindow(isDev) {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
@@ -618,8 +704,6 @@ function createTray() {
   tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus(); });
 }
 
-import { loadStore, saveStore } from './store.js';
-
 // ── App startup — only ONE whenReady call ────────────────────────
 let brainIndex;
 
@@ -666,6 +750,28 @@ ipcMain.handle('resize-popup', (event, windowId, dimensions) => {
   return false;
 });
 
+ipcMain.handle('focus-popup', (event, windowId) => {
+  const win = popupWindows[windowId];
+  if (!win) return false;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+  return true;
+});
+
+ipcMain.handle('minimize-popup', (event, windowId, minimize = true) => {
+  const win = popupWindows[windowId];
+  if (!win) return false;
+  if (minimize) {
+    win.minimize();
+    return true;
+  }
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+  return true;
+});
+
 ipcMain.handle('get-system-info', () => {
   const cpus = os.cpus();
   let totalIdle = 0, totalTick = 0;
@@ -704,6 +810,20 @@ ipcMain.handle('system:store-save', (event, data) => {
   return saveStore(data, app);
 });
 
+// NEW: Store field operations for granular updates
+ipcMain.handle('system:store-field-get', (event, fieldName) => {
+  return getStoreField(fieldName, app);
+});
+
+ipcMain.handle('system:store-field-set', (event, fieldName, fieldValue) => {
+  return setStoreField(fieldName, fieldValue);
+});
+
+// NEW: Store backup
+ipcMain.handle('system:store-backup', () => {
+  return backupStore(app);
+});
+
 ipcMain.handle('system:scan-apps', async () => {
   return new Promise((resolve) => {
     const { exec } = require('child_process');
@@ -727,26 +847,33 @@ ipcMain.handle('system:scan-apps', async () => {
 });
 
 ipcMain.handle('system:launch-app', async (event, appId) => {
-  const { shell } = require('electron');
-  const appMap = {
-    outlook: 'outlook.exe',
-    whatsapp: 'WhatsApp.exe',
-    chrome: 'chrome.exe',
-    excel: 'excel.exe',
-    word: 'winword.exe',
-    explorer: 'explorer.exe',
-  };
-  const command = appMap[appId] || appId;
+  const requestedId = String(appId || '').trim().toLowerCase();
+  if (requestedId === 'settings' || requestedId === 'ms-settings' || requestedId === 'ms-settings:') {
+    try {
+      await shell.openExternal('ms-settings:');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const command = LAUNCHABLE_APPS[requestedId];
+  if (!command) {
+    console.warn(`Blocked launch request for unknown appId: ${String(appId)}`);
+    return false;
+  }
   try {
     try {
       await shell.openExternal(`shell:AppsFolder\\${command}`);
       return true;
     } catch { }
 
-    const { exec } = require('child_process');
+    const { spawn } = require('child_process');
     return await new Promise((resolve) => {
-      exec(`start "" "${command}"`, (error) => {
-        resolve(!error);
+      const child = spawn(command, [], { detached: true, stdio: 'ignore', shell: false });
+      child.once('error', () => resolve(false));
+      child.once('spawn', () => {
+        child.unref();
+        resolve(true);
       });
     });
   } catch (err) {
@@ -756,8 +883,31 @@ ipcMain.handle('system:launch-app', async (event, appId) => {
 });
 
 ipcMain.handle('system:open-url', async (event, url) => {
-  const { shell } = require('electron');
-  return shell.openExternal(url);
+  const safeUrl = String(url || '').trim();
+  if (!isSafeExternalUrl(safeUrl)) {
+    console.warn(`Blocked open-url request for unsafe URL: ${safeUrl}`);
+    return false;
+  }
+  try {
+    await shell.openExternal(safeUrl);
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.handle('system:open-path', async (event, targetPath) => {
+  const safePath = sanitizeFsPath(targetPath);
+  if (!safePath || !isAllowedFsPath(safePath)) {
+    console.warn(`Blocked open-path request: ${String(targetPath)}`);
+    return false;
+  }
+  try {
+    const errText = await shell.openPath(safePath);
+    return errText === '';
+  } catch {
+    return false;
+  }
 });
 
 // Brain Index handlers
@@ -1160,6 +1310,88 @@ ipcMain.handle('email:send', async (event, providerId, payload) => {
   return { ok: true };
 });
 
+// ── Filesystem IPC handlers ──────────────────────────────────────
+ipcMain.handle('fs:listDir', async (event, dirPath) => {
+  try {
+    const safeDirPath = sanitizeFsPath(dirPath);
+    if (!safeDirPath || !isAllowedFsPath(safeDirPath)) {
+      return { files: [], error: 'Access denied for requested directory.' };
+    }
+
+    const entries = await fs.promises.readdir(safeDirPath, { withFileTypes: true });
+    const files = (await Promise.all(entries.map(async (entry) => {
+      const fullPath = path.join(safeDirPath, entry.name);
+      let stat;
+      try {
+        stat = await fs.promises.stat(fullPath);
+      } catch {
+        return null;
+      }
+      return {
+        name: entry.name,
+        isDirectory: entry.isDirectory(),
+        size: stat ? stat.size : 0,
+        modified: stat ? stat.mtimeMs : 0,
+        path: fullPath,
+        extension: entry.isFile() ? path.extname(entry.name).slice(1).toLowerCase() : undefined,
+      };
+    }))).filter(Boolean);
+    return { files, error: null };
+  } catch (err) {
+    return { files: [], error: String(err.message || err) };
+  }
+});
+
+ipcMain.handle('fs:readFile', async (event, filePath) => {
+  try {
+    const safeFilePath = sanitizeFsPath(filePath);
+    if (!safeFilePath || !isAllowedFsPath(safeFilePath)) {
+      return { content: null, error: 'Access denied for requested file.' };
+    }
+
+    // Only allow reading text-based files (prevent binary file issues)
+    const ext = path.extname(safeFilePath).toLowerCase();
+    const textExtensions = ['.txt', '.md', '.json', '.xml', '.html', '.htm', '.css', '.js', '.ts', '.tsx', '.jsx', '.py', '.java', '.yaml', '.yml', '.csv', '.sql', '.log', '.env', '.ini', '.cfg', '.conf', '.bat', '.sh', '.ps1'];
+
+    if (!textExtensions.includes(ext)) {
+      return { content: null, error: `Preview not available for .${ext.slice(1)} files. Open in default app instead.` };
+    }
+
+    // Limit file size to 5MB for reading
+    const stat = await fs.promises.stat(safeFilePath);
+    if (stat.size > 5 * 1024 * 1024) {
+      return { content: null, error: `File too large to preview (${(stat.size / 1024 / 1024).toFixed(1)} MB)` };
+    }
+
+    const content = await fs.promises.readFile(safeFilePath, 'utf-8');
+    return { content, error: null };
+  } catch (err) {
+    return { content: null, error: String(err.message || err) };
+  }
+});
+
+ipcMain.handle('fs:getFileInfo', async (event, filePath) => {
+  try {
+    const safeFilePath = sanitizeFsPath(filePath);
+    if (!safeFilePath || !isAllowedFsPath(safeFilePath)) {
+      return { error: 'Access denied for requested file.' };
+    }
+    const stat = await fs.promises.stat(safeFilePath);
+    return {
+      name: path.basename(safeFilePath),
+      path: safeFilePath,
+      isDirectory: stat.isDirectory(),
+      size: stat.size,
+      created: stat.birthtimeMs,
+      modified: stat.mtimeMs,
+      accessed: stat.atimeMs,
+      extension: path.extname(safeFilePath).slice(1).toLowerCase(),
+    };
+  } catch (err) {
+    return { error: String(err.message || err) };
+  }
+});
+
 // ── Popup windows ────────────────────────────────────────────────
 function createPopupWindow(windowId, opts, isDev) {
   if (popupWindows[windowId]) {
@@ -1207,6 +1439,100 @@ function createPopupWindow(windowId, opts, isDev) {
   popupWindows[windowId] = win;
   return win;
 }
+
+// ── Error logging IPC handler ───────────────────────────────────
+ipcMain.handle('log:error', async (_event, payload) => {
+  try {
+    const logDir = app.getPath('userData');
+    const logFile = path.join(logDir, 'error.log');
+    const timestamp = new Date().toISOString();
+    const { name = 'Unknown', message = 'No message', stack = 'No stack' } = payload || {};
+    const entry = [
+      `[${timestamp}]`,
+      `Component: ${name}`,
+      `Message: ${message}`,
+      `Stack: ${stack}`,
+      '─'.repeat(80),
+      '',
+    ].join('\n');
+    await fs.promises.appendFile(logFile, entry, 'utf-8');
+  } catch (err) {
+    // Fallback to console if file write fails
+    console.error('[log:error] Failed to write to error log:', err);
+  }
+});
+
+// ── Native Notification IPC handlers ─────────────────────────────
+const { Notification: ElectronNotification } = electron.default;
+const notificationHistory = [];
+const activeNotifications = new Map();
+
+ipcMain.handle('notify:send', async (event, { title, body, icon, type, onClickTarget }) => {
+  const id = crypto.randomUUID();
+  const notification = new ElectronNotification({
+    title: title || 'Baba Workspace',
+    body: body || '',
+    icon: icon || path.join(__dirname, '../renderer/assets/icon.png'),
+    urgency: type === 'error' ? 'critical' : type === 'warning' ? 'normal' : 'low',
+  });
+
+  const record = {
+    id,
+    title,
+    body,
+    icon,
+    type: type || 'info',
+    timestamp: Date.now(),
+    read: false,
+    onClickTarget: onClickTarget || null,
+  };
+
+  notification.on('click', () => {
+    activeNotifications.set(id, { ...record, clicked: true });
+    if (onClickTarget) {
+      mainWindow?.webContents.send('notification:click', { id, target: onClickTarget });
+    }
+    mainWindow?.focus();
+    mainWindow?.show();
+  });
+
+  notification.on('close', () => {
+    activeNotifications.delete(id);
+  });
+
+  notification.show();
+  activeNotifications.set(id, record);
+  notificationHistory.unshift(record);
+
+  // Keep history capped at 200
+  if (notificationHistory.length > 200) {
+    notificationHistory.length = 200;
+  }
+
+  // Notify renderer about new notification
+  mainWindow?.webContents.send('notification:new', record);
+
+  return { id, success: true };
+});
+
+ipcMain.handle('notify:get-history', () => {
+  return [...notificationHistory];
+});
+
+ipcMain.handle('notify:mark-read', (event, ids) => {
+  const idSet = new Set(Array.isArray(ids) ? ids : [ids]);
+  for (const item of notificationHistory) {
+    if (idSet.has(item.id)) {
+      item.read = true;
+    }
+  }
+  return { success: true };
+});
+
+ipcMain.handle('notify:clear-history', () => {
+  notificationHistory.length = 0;
+  return { success: true };
+});
 
 // ── App lifecycle ────────────────────────────────────────────────
 // On Windows: all-windows-closed fires when tray is also gone, but we use isQuitting flag
