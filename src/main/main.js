@@ -594,13 +594,28 @@ function isAllowedFsPath(targetPath) {
   return roots.some((root) => isPathWithin(root, targetPath));
 }
 
-function resolveDesktopShortcutTarget() {
+function resolveDesktopShortcutTarget(mode = 'default') {
+  const isDevMode = mode === 'dev';
+
+  if (isDevMode) {
+    const iconCandidate = path.join(process.cwd(), 'release', 'win-unpacked', 'baba-workspace.exe');
+    const iconPath = fs.existsSync(iconCandidate) ? iconCandidate : process.execPath;
+    return {
+      target: path.join(process.env.WINDIR || 'C:\\Windows', 'System32', 'cmd.exe'),
+      args: `/c cd /d "${process.cwd()}" && npm run dev`,
+      icon: iconPath,
+      workingDirectory: process.cwd(),
+      description: 'Baba Workspace (Dev)',
+    };
+  }
+
   if (app.isPackaged) {
     return {
       target: process.execPath,
       args: '',
       icon: process.execPath,
       workingDirectory: path.dirname(process.execPath),
+      description: 'Baba Workspace',
     };
   }
 
@@ -611,6 +626,7 @@ function resolveDesktopShortcutTarget() {
       args: '',
       icon: packagedExe,
       workingDirectory: path.dirname(packagedExe),
+      description: 'Baba Workspace',
     };
   }
 
@@ -619,7 +635,29 @@ function resolveDesktopShortcutTarget() {
     args: `"${process.cwd()}"`,
     icon: process.execPath,
     workingDirectory: process.cwd(),
+    description: 'Baba Workspace',
   };
+}
+
+function getDesktopShortcutPlans() {
+  const plans = [];
+  const defaultPath = path.join(app.getPath('desktop'), 'Baba Workspace.lnk');
+  plans.push({ path: defaultPath, target: resolveDesktopShortcutTarget('default') });
+
+  if (!app.isPackaged) {
+    const userProfile = process.env.USERPROFILE || app.getPath('home');
+    const oneDriveDesktop = path.join(userProfile, 'OneDrive', 'Desktop');
+    const devPath = path.join(oneDriveDesktop, 'Baba Workspace (Dev).lnk');
+    plans.push({ path: devPath, target: resolveDesktopShortcutTarget('dev') });
+  }
+
+  // de-duplicate by path (case-insensitive on Windows)
+  const unique = new Map();
+  for (const plan of plans) {
+    const key = process.platform === 'win32' ? String(plan.path).toLowerCase() : String(plan.path);
+    if (!unique.has(key)) unique.set(key, plan);
+  }
+  return [...unique.values()];
 }
 
 const MASTER_MEMORY_SEED_SOURCE = 'master-memory:seed:2026-04-13';
@@ -968,29 +1006,39 @@ ipcMain.handle('system:create-desktop-shortcut', async () => {
   }
 
   try {
-    const shortcutPath = path.join(app.getPath('desktop'), 'Baba Workspace.lnk');
-    const target = resolveDesktopShortcutTarget();
-    const options = {
-      target: target.target,
-      args: target.args,
-      cwd: target.workingDirectory,
-      description: 'Baba Workspace',
-      icon: target.icon,
-      iconIndex: 0,
-      appUserModelId: 'com.silva.baba-workspace',
-    };
+    const plans = getDesktopShortcutPlans();
+    const createdPaths = [];
 
-    const created = shell.writeShortcutLink(shortcutPath, 'create', options)
-      || shell.writeShortcutLink(shortcutPath, 'update', options);
+    for (const plan of plans) {
+      const dir = path.dirname(plan.path);
+      if (!fs.existsSync(dir)) continue;
 
-    if (!created) {
-      return { ok: false, error: 'Failed to create desktop shortcut.' };
+      const options = {
+        target: plan.target.target,
+        args: plan.target.args,
+        cwd: plan.target.workingDirectory,
+        description: plan.target.description,
+        icon: plan.target.icon,
+        iconIndex: 0,
+        appUserModelId: 'com.silva.baba-workspace',
+      };
+
+      const created = shell.writeShortcutLink(plan.path, 'create', options)
+        || shell.writeShortcutLink(plan.path, 'update', options);
+
+      if (created) {
+        createdPaths.push(plan.path);
+      }
+    }
+
+    if (createdPaths.length === 0) {
+      return { ok: false, error: 'Failed to create desktop shortcuts.' };
     }
 
     return {
       ok: true,
-      path: shortcutPath,
-      target: target.target,
+      path: createdPaths[0],
+      paths: createdPaths,
     };
   } catch (err) {
     return { ok: false, error: String(err) };

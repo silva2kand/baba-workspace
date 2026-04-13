@@ -115,7 +115,7 @@ export async function sendDesktopNotification(title: string, body: string) {
   }
 }
 
-export async function createDesktopShortcut(): Promise<{ ok: boolean; path?: string; target?: string; error?: string }> {
+export async function createDesktopShortcut(): Promise<{ ok: boolean; path?: string; paths?: string[]; target?: string; error?: string }> {
   try {
     const result = await window.babaAPI?.createDesktopShortcut?.();
     if (!result) return { ok: false, error: 'Desktop shortcut API unavailable.' };

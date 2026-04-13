@@ -17,7 +17,7 @@ interface Window {
     launchApp: (appId: string) => Promise<boolean>;
     openUrl: (url: string) => Promise<boolean>;
     openPath: (targetPath: string) => Promise<boolean>;
-    createDesktopShortcut: () => Promise<{ ok: boolean; path?: string; target?: string; error?: string }>;
+    createDesktopShortcut: () => Promise<{ ok: boolean; path?: string; paths?: string[]; target?: string; error?: string }>;
     storeLoad: () => Promise<any>;
     storeSave: (data: any) => Promise<boolean>;
     scanApps: () => Promise<any[]>;
